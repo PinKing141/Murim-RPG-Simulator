@@ -2,24 +2,57 @@ import { clamp, cap } from './rng.js';
 import { ALIGN, REALMS, REALM_KR } from './data.js';
 import { STATE, aliveFigs, aliveSects, figById } from './state.js';
 import { sectMight, topMember } from './systems.js';
+import { FOLLOW, buildFigDossier, buildSectDossier } from './follow.js';
 
 const $ = id => document.getElementById(id);
 export let autoScroll = true;
-
 export function setAutoScroll(v) { autoScroll = v; }
 
 function bar(v, max, color) {
-  return `<div class="mini"><i style="width:${clamp(v / max * 100, 0, 100)}%;background:${color}"></i></div>`;
+  return `<div class="mini"><i style="width:${clamp(v/max*100,0,100)}%;background:${color}"></i></div>`;
 }
+
+/* ---- log rendering ---- */
 
 export function renderLog() {
   if (!STATE.dirtyLog) return;
   STATE.dirtyLog = false;
   const box = $("chron");
   const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+
+  const banner = $("follow-banner");
+
+  /* determine filter */
+  let entries;
+  const setBanner = (text) => {
+    banner.querySelector('.fb-text').innerHTML = text;
+    banner.style.display = 'flex';
+  };
+
+  if (FOLLOW.kind === 'fig') {
+    const f = figById(FOLLOW.id);
+    entries = STATE.log.filter(e => e.figs && e.figs.includes(FOLLOW.id));
+    if (f) {
+      const name = f.byeolho && f.namedAt != null ? cap(f.byeolho.en) : f.name;
+      setBanner(`<span class="fb-label">Following</span> <span class="fb-name">${name}</span><span class="fb-dim"> · ${entries.length} entries</span>`);
+    }
+  } else if (FOLLOW.kind === 'sect') {
+    const s = STATE.sects.find(x => x.id === FOLLOW.id);
+    if (s) {
+      const memberSet = new Set(s.allMembers);
+      entries = STATE.log.filter(e =>
+        (e.sects && e.sects.includes(FOLLOW.id)) ||
+        (e.figs && e.figs.some(id => memberSet.has(id)))
+      );
+      setBanner(`<span class="fb-label">Following</span> <span class="fb-name">${s.name} (${s.kr})</span><span class="fb-dim"> · ${entries.length} entries</span>`);
+    } else { entries = STATE.log.slice(-260); banner.style.display = 'none'; }
+  } else {
+    entries = STATE.log.slice(-260);
+    banner.style.display = 'none';
+  }
+
   const frag = document.createDocumentFragment();
   box.innerHTML = "";
-  const entries = STATE.log.slice(-260);
   let lastYear = null;
   for (const e of entries) {
     if (e.year !== lastYear) {
@@ -38,6 +71,8 @@ export function renderLog() {
   if (autoScroll && atBottom) box.scrollTop = box.scrollHeight;
 }
 
+/* ---- panel rendering ---- */
+
 export function renderPanels() {
   if (!STATE.dirtyPanels) return;
   STATE.dirtyPanels = false;
@@ -51,8 +86,9 @@ export function renderPanels() {
   $("s-art").textContent = STATE.arts.filter(a => !a.lost && !a.dormant).length;
   $("s-lost").textContent = STATE.arts.filter(a => a.lost || a.dormant).length;
 
+  /* ---- left: sects ---- */
   const sl = $("sectlist");
-  const sects = [...STATE.sects].sort((a, b) => (b.alive - a.alive) || (sectMight(b) - sectMight(a)));
+  const sects = [...STATE.sects].sort((a,b) => (b.alive - a.alive) || (sectMight(b) - sectMight(a)));
   $("sectct").textContent = aliveSects().length;
   sl.innerHTML = "";
   for (const s of sects.slice(0, 16)) {
@@ -60,7 +96,9 @@ export function renderPanels() {
     const living = s.members.map(figById).filter(x => x && x.alive);
     const lead = topMember(s);
     const div = document.createElement("div");
-    div.className = "sect" + (s.alive ? "" : " dead");
+    const isFollowed = FOLLOW.kind === 'sect' && FOLLOW.id === s.id;
+    div.className = "sect" + (s.alive ? "" : " dead") + (isFollowed ? " followed" : "");
+    div.dataset.id = s.id;
     div.style.setProperty("--c", al.c);
     const leadName = lead ? (lead.byeolho && lead.namedAt != null ? cap(lead.byeolho.en) : lead.name) : "";
     div.innerHTML = `
@@ -78,27 +116,47 @@ export function renderPanels() {
     sl.appendChild(div);
   }
 
-  const fl = $("figlist");
-  const figs = aliveFigs().sort((a, b) => (b.isThreat - a.isThreat) || (b.power - a.power)).slice(0, 12);
-  $("figct").textContent = aliveFigs().length;
-  fl.innerHTML = "";
-  for (const f of figs) {
-    const al = ALIGN[f.align];
-    const div = document.createElement("div");
-    div.className = "figcard";
-    div.style.setProperty("--c", al.c);
-    const named = f.byeolho && f.namedAt != null;
-    div.innerHTML = `
-      <div class="fig-name">${named ? `<span class="fig-alias">${cap(f.byeolho.en)} · ${f.byeolho.kr}</span>` : f.name}</div>
-      <div class="fig-sub">${named ? f.name + " · " : ""}${al.label}${f.isThreat ? ` · <span style="color:var(--blood)">천마 HEAVENLY DEMON</span>` : ""}${f.sect ? " · " + f.sect.name : " · wanderer"}</div>
-      <span class="fig-realm">${REALMS[f.realm]} · ${REALM_KR[f.realm]}</span>
-      <div class="fig-bars">
-        <span>내공</span>${bar(f.power, 1100, al.c)}
-        <span>명성</span>${bar(f.fame, 60, "var(--gold)")}
-        <span>마기</span>${bar(f.alignmentDrift, 100, "var(--magyo)")}
-      </div>
-      ${f.art ? `<div class="fig-sub" style="margin-top:6px">${f.art.name} (${f.art.kr}) · tier ${f.art.tier}</div>` : ""}
-    `;
-    fl.appendChild(div);
+  /* ---- right panel: dossier or figure list ---- */
+  const dossierWrap = $("dossier-wrap");
+  const figPanel    = $("fig-panel");
+
+  if (FOLLOW.kind === 'fig') {
+    const f = figById(FOLLOW.id);
+    figPanel.style.display = 'none';
+    dossierWrap.style.display = 'block';
+    dossierWrap.innerHTML = f ? buildFigDossier(f) : '<div class="dos-empty">Figure not found.</div>';
+  } else if (FOLLOW.kind === 'sect') {
+    const s = STATE.sects.find(x => x.id === FOLLOW.id);
+    figPanel.style.display = 'none';
+    dossierWrap.style.display = 'block';
+    dossierWrap.innerHTML = s ? buildSectDossier(s) : '<div class="dos-empty">Sect not found.</div>';
+  } else {
+    figPanel.style.display = '';
+    dossierWrap.style.display = 'none';
+
+    const fl = $("figlist");
+    const figs = aliveFigs().sort((a,b) => (b.isThreat - a.isThreat) || (b.power - a.power)).slice(0, 12);
+    $("figct").textContent = aliveFigs().length;
+    fl.innerHTML = "";
+    for (const f of figs) {
+      const al = ALIGN[f.align];
+      const div = document.createElement("div");
+      div.className = "figcard";
+      div.dataset.id = f.id;
+      div.style.setProperty("--c", al.c);
+      const named = f.byeolho && f.namedAt != null;
+      div.innerHTML = `
+        <div class="fig-name">${named ? `<span class="fig-alias">${cap(f.byeolho.en)} · ${f.byeolho.kr}</span>` : f.name}</div>
+        <div class="fig-sub">${named ? f.name + " · " : ""}${al.label}${f.isThreat ? ` · <span style="color:var(--blood)">천마 HEAVENLY DEMON</span>` : ""}${f.sect ? " · " + f.sect.name : " · wanderer"}</div>
+        <span class="fig-realm">${REALMS[f.realm]} · ${REALM_KR[f.realm]}</span>
+        <div class="fig-bars">
+          <span>내공</span>${bar(f.power, 1100, al.c)}
+          <span>명성</span>${bar(f.fame, 60, "var(--gold)")}
+          <span>마기</span>${bar(f.alignmentDrift, 100, "var(--magyo)")}
+        </div>
+        ${f.art ? `<div class="fig-sub" style="margin-top:6px">${f.art.name} (${f.art.kr}) · tier ${f.art.tier}</div>` : ""}
+      `;
+      fl.appendChild(div);
+    }
   }
 }

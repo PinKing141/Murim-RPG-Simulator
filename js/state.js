@@ -48,7 +48,7 @@ export function makeArt(align) {
     corruption: align === "demonic" ? ri(35,70) : align === "unorthodox" ? ri(15,40) : ri(0,12),
     lost: false, dormant: false,
     holders: 0, origin: STATE.year, lostYear: null,
-    lostHolder: null
+    lostHolder: null, lostHolderId: null
   };
 }
 
@@ -85,7 +85,8 @@ export function makeFigure(opts = {}) {
     lineage: opts.lineage || null,
     alive: true, born: STATE.year,
     isThreat: false, namedAt: null,
-    grudges: []
+    grudges: [], brothers: [],
+    realmHistory: [], lineageId: null
   };
   recomputeLife(f);
   recomputePower(f);
@@ -102,7 +103,7 @@ export function makeSect(opts = {}) {
     region: opts.region || pick(REGIONS),
     founded: STATE.year,
     prestige: opts.prestige != null ? opts.prestige : ri(25, 55),
-    members: [],
+    members: [], allMembers: [],
     signatureArt: null,
     alive: true, deadYear: null,
     atWarWith: []

@@ -8,7 +8,9 @@ export function maybeName(f, force) {
   if (force || (f.realm >= 3 && f.fame >= 14)) {
     f.byeolho = makeByeolho();
     f.namedAt = STATE.year;
-    chron("c-rise", `${plainRef(f)}${f.sect ? " of " + f.sect.name + " (" + f.sect.kr + ")" : ""} has won renown across the land, now spoken of as <span class="nm">${cap(f.byeolho.en)} (${f.byeolho.kr})</span>.`, "major");
+    chron("c-rise",
+      `${plainRef(f)}${f.sect ? " of " + f.sect.name + " (" + f.sect.kr + ")" : ""} has won renown across the land, now spoken of as <span class="nm">${cap(f.byeolho.en)} (${f.byeolho.kr})</span>.`,
+      "major", [f.id]);
   }
 }
 
@@ -23,9 +25,13 @@ export function alignShift(f, amount, reason) {
   if (na !== before && f.align !== "recluse") {
     f.align = na;
     if (na === "demonic") {
-      chron("c-corrupt", `${ref(f)} has fallen to the Demonic Path (마도)${reason ? " — " + reason : ""}. The energy about them turns cold and ravenous.`, "major");
+      chron("c-corrupt",
+        `${ref(f)} has fallen to the Demonic Path (마도)${reason ? " — " + reason : ""}. The energy about them turns cold and ravenous.`,
+        "major", [f.id]);
     } else if (na === "unorthodox" && before === "orthodox") {
-      chron("c-corrupt", `${ref(f)} forsakes the orthodox canon for unorthodox methods${reason ? " after " + reason : ""}.`, "normal");
+      chron("c-corrupt",
+        `${ref(f)} forsakes the orthodox canon for unorthodox methods${reason ? " after " + reason : ""}.`,
+        "normal", [f.id]);
     }
     recomputeLife(f);
   }
@@ -37,11 +43,15 @@ export function killFigure(f, why) {
   if (f.art) f.art.holders = Math.max(0, f.art.holders - 1);
   if (f.namedAt != null || f.realm >= 4) {
     const lvl = f.realm >= 6 ? "major" : "normal";
-    chron("c-death", `${ref(f)}${f.sect ? " of " + f.sect.name : ""} ${why}. ${f.realm >= 6 ? "An age ends with them." : ""}`, lvl);
+    chron("c-death",
+      `${ref(f)}${f.sect ? " of " + f.sect.name : ""} ${why}. ${f.realm >= 6 ? "An age ends with them." : ""}`,
+      lvl, [f.id]);
     if (f.isThreat) {
       STATE.threatActive = false;
-      chron("c-peace", `With the fall of the Heavenly Demon, the Murim exhales. Yet ${aref(f.art)} was never recovered...`, "major");
-      if (f.art) { f.art.dormant = true; f.art.lostHolder = f.name; }
+      chron("c-peace",
+        `With the fall of the Heavenly Demon, the Murim exhales. Yet ${aref(f.art)} was never recovered...`,
+        "major", [f.id]);
+      if (f.art) { f.art.dormant = true; f.art.lostHolder = f.name; f.art.lostHolderId = f.id; }
     }
   }
 }
@@ -56,7 +66,9 @@ export function dissolveSect(s, why) {
   s.alive = false; s.deadYear = STATE.year;
   const surv = s.members.map(figById).filter(x => x && x.alive);
   for (const f of surv) { f.sect = null; if (chance(.3) && f.align === "orthodox") f.align = "unorthodox"; }
-  chron("c-fall", `${sref(s)} is ${why}; its disciples scatter into the Gangho, its halls left to the crows.`, "major");
+  chron("c-fall",
+    `${sref(s)} is ${why}; its disciples scatter into the Gangho, its halls left to the crows.`,
+    "major", [], [s.id]);
   if (s.signatureArt && s.signatureArt.holders <= 1 && chance(.5)) {
     loseArt(s.signatureArt, `buried in the ruin of ${s.name}`);
   }
@@ -75,7 +87,9 @@ function battle(A, B, pa, pb, w) {
   }
   const cA = topMember(winner), cB = topMember(loser);
   if (cA && cB && chance(.25)) {
-    chron("c-duel", `At the height of ${w.name}, ${ref(cA)} crosses blades with ${ref(cB)} — ${pick(["a clash that splits the very air","three hundred exchanges beneath a bleeding moon","steel and naegong until the river ran red"])}.`, "normal");
+    chron("c-duel",
+      `At the height of ${w.name}, ${ref(cA)} crosses blades with ${ref(cB)} — ${pick(["a clash that splits the very air","three hundred exchanges beneath a bleeding moon","steel and naegong until the river ran red"])}.`,
+      "normal", [cA.id, cB.id]);
   }
 }
 
@@ -85,7 +99,9 @@ function endWar(w, A, B, winner, loser) {
   if (B) B.atWarWith = B.atWarWith.filter(id => !A || id !== A.id);
   if (winner && loser) {
     winner.prestige += ri(8, 18); loser.prestige -= ri(15, 30);
-    chron("c-war", `${w.name} (${w.kr}) ends. ${sref(winner)} stands victorious; ${sref(loser)} is broken and humbled.`, "major");
+    chron("c-war",
+      `${w.name} (${w.kr}) ends. ${sref(winner)} stands victorious; ${sref(loser)} is broken and humbled.`,
+      "major", [], [winner.id, loser.id]);
     if (loser.prestige <= 8 || chance(.4)) dissolveSect(loser, `shattered in ${w.name}`);
   }
 }
@@ -102,16 +118,21 @@ export function sysCultivation() {
     f.progress += gain;
     if (f.progress >= 100) {
       f.progress = 0; f.realm++;
+      f.realmHistory.push({ year: STATE.year, realm: f.realm });
       recomputeLife(f); recomputePower(f);
       f.fame += 3 + f.realm;
       const fl = PATH_FLAVOR[f.align];
       if (f.realm >= 3) {
         const lvl = f.realm >= 6 ? "major" : "normal";
-        chron("c-break", `${ref(f)} ${fl.verb} the realm of <b style="color:var(--gold)">${REALMS[f.realm]} (${REALM_KR[f.realm]})</b>, ${pick(fl.via)}.`, lvl);
+        chron("c-break",
+          `${ref(f)} ${fl.verb} the realm of <b style="color:var(--gold)">${REALMS[f.realm]} (${REALM_KR[f.realm]})</b>, ${pick(fl.via)}.`,
+          lvl, [f.id]);
       }
       maybeName(f);
       if (f.realm === APEX) {
-        chron("c-break", `Heaven itself takes notice: ${ref(f)} has touched the <b style="color:var(--gold-bright)">Nature Realm (자연경)</b>, the apex no mortal is meant to reach.`, "epic");
+        chron("c-break",
+          `Heaven itself takes notice: ${ref(f)} has touched the <b style="color:var(--gold-bright)">Nature Realm (자연경)</b>, the apex no mortal is meant to reach.`,
+          "epic", [f.id]);
       }
     }
   }
@@ -133,22 +154,29 @@ export function sysAging() {
   }
 }
 
+function addToSect(s, f) {
+  s.members.push(f.id);
+  if (!s.allMembers.includes(f.id)) s.allMembers.push(f.id);
+}
+
 export function sysRecruitment() {
   for (const s of aliveSects()) {
     const living = s.members.map(figById).filter(x => x && x.alive);
     if (living.length < 3) {
       for (let i = 0; i < ri(1, 2); i++) {
         const f = makeFigure({ align: s.align, sect: s, art: s.signatureArt, realm: 0, age: ri(13,18), talent: ri(15,70) });
-        s.members.push(f.id); STATE.figures.push(f);
+        addToSect(s, f); STATE.figures.push(f);
         if (s.signatureArt) s.signatureArt.holders++;
       }
     } else if (chance(.35) && living.length < 14) {
       const master = pick(living.filter(x => x.realm >= 3)) || pick(living);
       const f = makeFigure({ align: s.align, sect: s, art: s.signatureArt, realm: 0, age: ri(12,17), talent: ri(15,75), master: master ? master.id : null });
-      s.members.push(f.id); STATE.figures.push(f);
+      addToSect(s, f); STATE.figures.push(f);
       if (s.signatureArt) s.signatureArt.holders++;
       if (f.talent >= 68) {
-        chron("c-lineage", `A prodigy named ${plainRef(f)} is taken in by ${sref(s)}; the elders whisper of a rare innate root.`, "normal");
+        chron("c-lineage",
+          `A prodigy named ${plainRef(f)} is taken in by ${sref(s)}; the elders whisper of a rare innate root.`,
+          "normal", [f.id], [s.id]);
       }
     }
   }
@@ -162,7 +190,9 @@ export function sysArtRefinement() {
       a.tier++;
       const m = pick(masters);
       const ord = ["","first","second","third","fourth","fifth","sixth","seventh","eighth","ninth"][a.tier];
-      chron("c-art", `${ref(m)} comprehends a higher layer of ${aref(a)}, refining it to its ${ord} stratum.`, a.tier >= 7 ? "major" : "normal");
+      chron("c-art",
+        `${ref(m)} comprehends a higher layer of ${aref(a)}, refining it to its ${ord} stratum.`,
+        a.tier >= 7 ? "major" : "normal", [m.id]);
     }
   }
 }
@@ -191,7 +221,9 @@ export function sysRivalryAndWar() {
         a.atWarWith.push(b.id); b.atWarWith.push(a.id);
         const cause = enemyPaths ? "the orthodox cannot abide the demonic" :
           pick(["a stolen manual","an assassinated elder","a contested mountain","an old blood-debt","a marriage betrayed","a duel gone wrong"]);
-        chron("c-war", `${pick(["Banners rise","War drums sound","Blood is sworn"])}: ${sref(a)} and ${sref(b)} fall into open war — ${w.name} (${w.kr}) — over ${cause}.`, "major");
+        chron("c-war",
+          `${pick(["Banners rise","War drums sound","Blood is sworn"])}: ${sref(a)} and ${sref(b)} fall into open war — ${w.name} (${w.kr}) — over ${cause}.`,
+          "major", [], [a.id, b.id]);
       }
     }
   }
@@ -209,7 +241,9 @@ export function sysCorruptionAndThreat() {
     if (!STATE.threatActive && f.align === "demonic" && f.realm >= 7 && f.alignmentDrift >= 85 && chance(.4)) {
       f.isThreat = true; STATE.threatActive = true;
       maybeName(f);
-      chron("c-threat", `A shadow falls over all under heaven: ${ref(f)} ascends as the <b style="color:var(--blood)">Heavenly Demon (천마)</b> and declares the old order finished. ${f.lineage ? `Heir to ${f.lineage}, ` : ""}the Murim trembles.`, "epic");
+      chron("c-threat",
+        `A shadow falls over all under heaven: ${ref(f)} ascends as the <b style="color:var(--blood)">Heavenly Demon (천마)</b> and declares the old order finished. ${f.lineage ? `Heir to ${f.lineage}, ` : ""}the Murim trembles.`,
+        "epic", [f.id]);
     }
   }
   if (STATE.threatActive) {
@@ -221,7 +255,9 @@ export function sysCorruptionAndThreat() {
         if (champ.power > threat.power * 0.85 && chance(.5)) {
           killFigure(threat, `is at last cut down by ${champ.byeolho ? cap(champ.byeolho.en) : champ.name} and the orthodox alliance (무림맹)`);
           champ.fame += 20; maybeName(champ);
-          chron("c-rise", `${ref(champ)} is hailed across the Murim as the hero who slew the Heavenly Demon.`, "major");
+          chron("c-rise",
+            `${ref(champ)} is hailed across the Murim as the hero who slew the Heavenly Demon.`,
+            "major", [champ.id]);
         } else {
           killFigure(champ, `is slain confronting the Heavenly Demon`);
         }
@@ -246,13 +282,18 @@ export function sysLostAndFound() {
       { n: "a wandering mute child",  t: ri(72,96) },
       { n: "a condemned prisoner",    t: ri(60,85) }
     ]);
+    const prevHolderId = a.lostHolderId;
     const f = makeFigure({ align: a.dormant ? "demonic" : (a.align === "demonic" ? "unorthodox" : a.align), realm: 1, age: ri(15,24), talent: arch.t, art: a });
     a.lost = false; a.dormant = false; a.holders = 1;
-    if (a.lostHolder) f.lineage = a.lostHolder + "'s legacy";
+    if (a.lostHolder) { f.lineage = a.lostHolder + "'s legacy"; f.lineageId = prevHolderId; }
     STATE.figures.push(f);
-    chron("c-found2", `In ${pick(REGIONS)}, ${arch.n} named ${plainRef(f)} stumbles upon ${aref(a)}, lost ${STATE.year - (a.lostYear || a.origin)} years. Fate chooses strangely.`, "major");
+    chron("c-found2",
+      `In ${pick(REGIONS)}, ${arch.n} named ${plainRef(f)} stumbles upon ${aref(a)}, lost ${STATE.year - (a.lostYear || a.origin)} years. Fate chooses strangely.`,
+      "major", [f.id]);
     if (a.dormant || a.corruption > 50) {
-      chron("c-corrupt", `The manual is steeped in old malice. Those who hear of it fear what ${plainRef(f)} may become.`, "normal");
+      chron("c-corrupt",
+        `The manual is steeped in old malice. Those who hear of it fear what ${plainRef(f)} may become.`,
+        "normal", [f.id]);
     }
   }
 }
@@ -268,10 +309,13 @@ export function sysSectFortune() {
       const founder = pick(wanderers);
       const s = makeSect({ align: founder.align, prestige: ri(30,50) });
       s.signatureArt = founder.art || pick(STATE.arts.filter(a => !a.lost)) || null;
-      founder.sect = s; s.members.push(founder.id);
+      founder.sect = s;
+      addToSect(s, founder);
       STATE.sects.push(s);
       maybeName(founder, true);
-      chron("c-found", `From the ashes, ${ref(founder)} establishes ${sref(s)} in ${s.region}. A new power rises where the old fell.`, "major");
+      chron("c-found",
+        `From the ashes, ${ref(founder)} establishes ${sref(s)} in ${s.region}. A new power rises where the old fell.`,
+        "major", [founder.id], [s.id]);
     }
   }
 }
@@ -282,14 +326,15 @@ export function sysHeroicArcs() {
     if (figs.length >= 2) {
       const a = pick(figs); let b = pick(figs); let g = 0; while (b === a && g++ < 4) b = pick(figs);
       if (a !== b) {
-        const ev = pick([
-          () => `${ref(a)} and ${ref(b)} swear brotherhood beneath the peach blossoms, vowing to share fortune and ruin alike.`,
-          () => `A bitter duel: ${ref(a)} defeats ${ref(b)} atop ${pick(["Sword-Testing Cliff","the Frozen Pavilion","Lone Goose Peak","the Drunken Bridge"])}, sparing their life — and earning a lifelong grudge.`,
-          () => { a.grudges.push(b.id); return `${ref(b)} betrays ${ref(a)}, stealing a page of their manual under the new moon.`; },
-          () => `${ref(a)} takes ${ref(b)} as a sworn disciple, passing down hard-won insight.`,
-          () => `Rumour spreads that ${ref(a)} has fallen in love with ${ref(b)} — a romance the sects forbid.`
-        ]);
-        chron(pick(["c-duel","c-lineage","c-peace"]), ev(), "normal");
+        const events = [
+          { cls: "c-peace",   fn: () => { a.brothers.push(b.id); b.brothers.push(a.id); return `${ref(a)} and ${ref(b)} swear brotherhood beneath the peach blossoms, vowing to share fortune and ruin alike.`; } },
+          { cls: "c-duel",    fn: () => `A bitter duel: ${ref(a)} defeats ${ref(b)} atop ${pick(["Sword-Testing Cliff","the Frozen Pavilion","Lone Goose Peak","the Drunken Bridge"])}, sparing their life — and earning a lifelong grudge.` },
+          { cls: "c-lineage", fn: () => { a.grudges.push(b.id); return `${ref(b)} betrays ${ref(a)}, stealing a page of their manual under the new moon.`; } },
+          { cls: "c-lineage", fn: () => `${ref(a)} takes ${ref(b)} as a sworn disciple, passing down hard-won insight.` },
+          { cls: "c-peace",   fn: () => `Rumour spreads that ${ref(a)} has fallen in love with ${ref(b)} — a romance the sects forbid.` }
+        ];
+        const ev = pick(events);
+        chron(ev.cls, ev.fn(), "normal", [a.id, b.id]);
       }
     }
   }

@@ -11,7 +11,7 @@ export function plainRef(f) { return `<span class="nm">${f.name}</span>`; }
 export function sref(s)  { return s ? `<span class="sn">${s.name} (${s.kr})</span>` : "a vanished house"; }
 export function aref(a)  { return a ? `<em class="art">${a.name} (${a.kr})</em>` : "a forgotten art"; }
 
-export function chron(cls, html, level) {
-  STATE.log.push({ year: STATE.year, season: STATE.season, cls, html, level: level || "normal" });
+export function chron(cls, html, level, figs = [], sects = []) {
+  STATE.log.push({ year: STATE.year, season: STATE.season, cls, html, level: level || "normal", figs, sects });
   STATE.dirtyLog = true;
 }

@@ -36,11 +36,15 @@
   </aside>
 
   <main class="chronicle">
+    <div class="follow-banner" id="follow-banner" style="display:none">
+      <span class="fb-text"></span>
+      <button class="fb-clear" id="follow-clear">× Unfollow</button>
+    </div>
     <div class="chron-scroll" id="chron"></div>
     <div class="footer-note" id="fnote">The brush records all. Scroll up to read the past.</div>
   </main>
 
-  <aside class="panel right">
+  <aside class="panel right" id="right-panel">
     <div class="panel-title">State of the Murim</div>
     <div class="stat-grid">
       <div class="stat"><div class="v" id="s-fig">0</div><div class="l">Martial Artists</div></div>
@@ -54,8 +58,11 @@
       <span><i style="background:var(--magyo)"></i>마교 Demonic</span>
       <span><i style="background:var(--eunja)"></i>은자 Recluse</span>
     </div>
-    <div class="panel-title">The Mighty <span class="ct" id="figct">0</span></div>
-    <div id="figlist"></div>
+    <div id="fig-panel">
+      <div class="panel-title">The Mighty <span class="ct" id="figct">0</span></div>
+      <div id="figlist"></div>
+    </div>
+    <div id="dossier-wrap" style="display:none"></div>
   </aside>
 
 </div>
