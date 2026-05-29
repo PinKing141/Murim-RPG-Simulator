@@ -55,6 +55,27 @@ export function blocMight(b) {
   return m;
 }
 
+/*
+  The unorthodox middle (사파) are political actors, not a weighted coin.
+  A 사파 sect carries a persistent `stance` — which banner it currently
+  inclines toward — and an institutional memory of how blocs have used it.
+  These grievances never simply expire; they are the wedge a rival bloc
+  can later exploit.
+*/
+export function addBlocGrudge(s, bloc, reason, eventId) {
+  if (s.blocGrudges.some(g => g.blocId === bloc.id)) return;
+  s.blocGrudges.push({ blocId: bloc.id, blocType: bloc.type, reason, event: eventId, year: STATE.year });
+}
+export function blocGrudgeAgainst(s, bloc) {
+  return s.blocGrudges.find(g => g.blocId === bloc.id) ||
+         s.blocGrudges.find(g => g.blocType === bloc.type) || null;
+}
+export const stanceLabel = st =>
+  st >=  55 ? "loyal to the orthodox oath" :
+  st >=  20 ? "leaning orthodox" :
+  st <= -55 ? "in the cult's pocket" :
+  st <= -20 ? "leaning demonic" : "stubbornly neutral";
+
 /* the single strongest living martial artist across a set of sects,
    returned with the sect they belong to — the natural candidate for 맹주/교주 */
 export function strongestIn(sects) {

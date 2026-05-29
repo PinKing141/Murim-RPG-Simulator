@@ -1,7 +1,8 @@
-import { cap } from './rng.js';
+import { cap, clamp } from './rng.js';
 import { ALIGN, REALMS, REALM_KR } from './data.js';
 import { STATE, figById } from './state.js';
 import { bloodGrudges } from './bloodlines.js';
+import { stanceLabel } from './factions.js';
 
 export const FOLLOW = { kind: null, id: null };
 
@@ -244,6 +245,22 @@ export function buildSectDossier(s) {
   h += `</div>`;
   h += `<div class="dos-meta">Founded Year ${s.founded}${!s.alive && s.deadYear ? ` · Dissolved Year ${s.deadYear}` : ''} · ${s.region}</div>`;
   h += `<div class="dos-meta">Prestige ${Math.round(s.prestige)} · ${living.length} living disciples · ${s.allMembers.length} total</div>`;
+
+  /* the unorthodox middle: where this house leans, and what it remembers */
+  if (s.align === "unorthodox") {
+    const pct = (clamp(s.stance, -100, 100) + 100) / 2;
+    h += `<div class="dos-stance"><span class="dos-role">Stance</span>`;
+    h += `<div class="stance-track"><div class="stance-pin" style="left:${pct}%"></div></div>`;
+    h += `<span class="stance-lbl">${stanceLabel(s.stance)}</span></div>`;
+  }
+  if (s.blocGrudges && s.blocGrudges.length) {
+    h += `<div class="dos-sec">Old Wounds</div>`;
+    for (const g of s.blocGrudges) {
+      const bl = STATE.blocs.find(x => x.id === g.blocId);
+      const nm = bl ? `${bl.name} (${bl.kr})` : "a since-broken banner";
+      h += `<div class="dos-conn dos-wounds"><span class="dos-role">Y${g.year}</span>${nm} — ${g.reason}${g.event != null ? ` <button class="why-btn" data-chain="${g.event}">⛓</button>` : ""}</div>`;
+    }
+  }
 
   if (!s.alive && s.fallEvent != null) {
     h += `<button class="why-btn" data-chain="${s.fallEvent}">⛓ Why did this house fall?</button>`;

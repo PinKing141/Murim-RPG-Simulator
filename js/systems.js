@@ -8,7 +8,8 @@ import {
 } from './bloodlines.js';
 import {
   makeBloc, aliveBlocs, allianceBloc, cultBloc, sectBloc,
-  blocLeader, blocSects, strongestIn
+  blocLeader, blocSects, strongestIn,
+  addBlocGrudge, blocGrudgeAgainst
 } from './factions.js';
 
 export function maybeName(f, force, causes = []) {
@@ -431,6 +432,16 @@ export function sysBonds() {
     const bb = b.sect ? sectBloc(b.sect.id) : null;
     const stateMatch = ba && bb && ba.id === bb.id && a.sect.id !== b.sect.id;
     if (stateMatch) ba.cohesion = clamp(ba.cohesion + ri(3, 8), 0, 100);
+    /* a 사파 house that marries into an orthodox line within the alliance
+       takes a long step toward becoming orthodox in truth */
+    if (stateMatch && ba.type === "alliance") {
+      for (const [m, other] of [[a, b], [b, a]]) {
+        if (m.sect && m.sect.align === "unorthodox" && other.sect && other.sect.align === "orthodox") {
+          m.sect.marriedOrthodox = true;
+          m.sect.stance = clamp(m.sect.stance + ri(4, 10), -100, 100);
+        }
+      }
+    }
     if (a.namedAt != null || b.namedAt != null || a.clan || b.clan || stateMatch) {
       const line = stateMatch
         ? ` — a marriage of state (정략혼) knitting two houses of ${bref(ba)} closer`
@@ -589,6 +600,96 @@ function fractureAlliance(b) {
   }
 }
 
+/* ---- the unorthodox middle in bloc politics ---- */
+
+/*
+  A bloc courts a 사파 house. Whether it joins turns on the sect's own
+  stance, its memory of past banners, and — for the alliance — raw leverage.
+  An alliance strong enough can compel a weaker unorthodox house into the
+  oath, but coercion plants a grudge the cult can later turn. Returns true
+  if the sect ends up flying the bloc's banner.
+*/
+function courtUnorthodox(bloc, s, leaderFig, cause = []) {
+  if (s.align !== "unorthodox" || !s.alive) return false;
+  if (sectBloc(s.id)) return false;                 // already sworn elsewhere
+  const grudge = blocGrudgeAgainst(s, bloc);
+
+  let p = bloc.type === "alliance" ? 0.5 + s.stance / 200 : 0.5 - s.stance / 200;
+  if (grudge && grudge.blocType === bloc.type) p -= 0.45;   // they remember this banner
+  p = clamp(p, 0.02, 0.95);
+
+  if (chance(p)) {
+    bloc.memberSects.push(s.id);
+    s.joinedBlocYear = STATE.year; s.coerced = false;
+    if (bloc.type === "cult") {
+      chron("c-faction",
+        `${sref(s)}, long courted with promises of autonomy, throws in with ${bref(bloc)} — the unorthodox find the cult's terms more honest than the orthodox oath.`,
+        "major", [], [s.id], cause);
+    }
+    return true;
+  }
+
+  /* the alliance can still compel a weaker 사파 house — at a cost it remembers */
+  if (bloc.type === "alliance" && leaderFig && leaderFig.sect) {
+    const ls = leaderFig.sect;
+    const gap = sectMight(ls) - sectMight(s);
+    if (gap > sectMight(s) * 0.4 && ls.prestige > 30 && chance(.55)) {
+      bloc.memberSects.push(s.id);
+      s.joinedBlocYear = STATE.year; s.coerced = true;
+      s.stance = clamp(s.stance - ri(15, 30), -100, 100);
+      ls.prestige -= ri(4, 9);
+      const ev = chron("c-faction",
+        `${sref(s)} is pressed into ${bref(bloc)} under the weight of its 맹주 — a humiliation the unorthodox house swallows, and remembers.`,
+        "major", [leaderFig.id], [s.id], cause);
+      addBlocGrudge(s, bloc, "strong-armed into the oath", ev.id);
+      return true;
+    }
+  }
+  return false;
+}
+
+/*
+  The unorthodox middle reacts to how it is used: a willing ally warms to the
+  oath; a coerced house festers and may defect to the cult; a house generations
+  deep and intermarried into righteous lines may shed its 사파 repute entirely.
+*/
+function driftUnorthodox() {
+  const C = cultBloc();
+  for (const s of aliveSects()) {
+    if (s.align !== "unorthodox") continue;
+    const myBloc = sectBloc(s.id);
+    if (myBloc && myBloc.type === "alliance") {
+      s.loyalYears++;
+      s.stance = clamp(s.stance + (s.coerced ? ri(-2, 2) : ri(2, 5)), -100, 100);
+      /* a resentful, coerced house with somewhere to run repays the humiliation */
+      if (s.coerced && s.stance <= -45 && C && C.alive && chance(.4)) {
+        myBloc.memberSects = myBloc.memberSects.filter(id => id !== s.id);
+        C.memberSects.push(s.id);
+        s.joinedBlocYear = STATE.year; s.coerced = false;
+        const g = blocGrudgeAgainst(s, myBloc);
+        chron("c-schism",
+          `${sref(s)} casts off the oath of ${bref(myBloc)} and defects to ${bref(C)} — an old humiliation repaid in betrayal.`,
+          "major", [], [s.id], g && g.event != null ? [g.event] : []);
+        myBloc.cohesion = clamp(myBloc.cohesion - ri(5, 12), 0, 100);
+        continue;
+      }
+      /* a loyal, intermarried house, generations deep, becomes orthodox in truth */
+      if (!s.coerced && s.marriedOrthodox && s.loyalYears >= 18 && s.stance >= 70 && chance(.25)) {
+        s.align = "orthodox";
+        chron("c-faction",
+          `After generations beneath the orthodox banner — its blood now mingled with righteous houses — ${sref(s)} is reckoned a 정파 house in its own right, shedding the last of its unorthodox repute.`,
+          "major", [], [s.id], myBloc.formEvent != null ? [myBloc.formEvent] : []);
+      }
+    } else if (myBloc && myBloc.type === "cult") {
+      s.stance = clamp(s.stance - ri(2, 5), -100, 100);
+      s.loyalYears++;
+    } else {
+      s.stance += s.stance > 0 ? -1 : (s.stance < 0 ? 1 : 0);   // free agents cool toward neutral
+      s.loyalYears = 0;
+    }
+  }
+}
+
 export function sysFactions() {
   const threat = aliveFigs().find(f => f.isThreat) || null;
   const threatActive = STATE.threatActive && !!threat;
@@ -615,6 +716,9 @@ export function sysFactions() {
           `${threat ? `Under the Heavenly Demon ${ref(led)}` : `Led by ${ref(led)}`}, the demonic houses unite as ${bref(b)}. A single 교주 commands the Demonic Path, and all under heaven feel the cold.`,
           threat ? "epic" : "major", [led.id], b.memberSects, cause);
         b.formEvent = ev.id;
+        /* the cult buys the disaffected unorthodox with offers of autonomy */
+        for (const s of aliveSects().filter(x => x.align === "unorthodox" && x.stance <= -20))
+          courtUnorthodox(b, s, led, [ev.id]);
       }
     }
   }
@@ -626,7 +730,6 @@ export function sysFactions() {
     if (orthodox.length >= 2 && best) {
       const b = makeBloc("alliance", "orthodox", "the Murim Alliance", "무림맹");
       b.memberSects = orthodox.map(s => s.id);
-      for (const s of aliveSects().filter(x => x.align === "unorthodox")) if (chance(.45)) b.memberSects.push(s.id);
       b.leaderId = best.f.id; b.leaderSectId = best.s.id;
       const cult = cultBloc();
       if (cult) { b.rivalId = cult.id; cult.rivalId = b.id; }
@@ -639,6 +742,9 @@ export function sysFactions() {
         `The righteous houses set aside old feuds: ${b.memberSects.length} sects swear the oath of ${bref(b)}, raising ${ref(best.f)} of ${sref(best.s)} as 맹주 to stand against the demonic tide.`,
         "epic", [best.f.id], b.memberSects, cause);
       b.formEvent = ev.id;
+      /* the alliance's first test of statecraft: win the unorthodox middle */
+      for (const s of aliveSects().filter(x => x.align === "unorthodox"))
+        courtUnorthodox(b, s, best.f, [ev.id]);
     }
   }
 
@@ -673,6 +779,7 @@ export function sysFactions() {
       if (b.memberSects.includes(s.id)) continue;
       if (b.type === "cult" && s.align === "demonic") b.memberSects.push(s.id);
       else if (b.type === "alliance" && s.align === "orthodox" && chance(.5)) b.memberSects.push(s.id);
+      else if (s.align === "unorthodox" && chance(.2)) courtUnorthodox(b, s, blocLeader(b), b.formEvent != null ? [b.formEvent] : []);
     }
     b.peakMembers = Math.max(b.peakMembers, b.memberSects.length);
     if (!b.memberSects.length) { dissolveBloc(b, "crumbles to nothing, its banners abandoned to the wind"); continue; }
@@ -715,6 +822,9 @@ export function sysFactions() {
     if (C2.cohesion <= 0) dissolveBloc(C2, "collapses into warlord infighting, each 마두 claiming the throne for themselves",
       C2.formEvent != null ? [C2.formEvent] : []);
   }
+
+  /* the unorthodox middle shifts with the winds it has been made to weather */
+  driftUnorthodox();
 }
 
 /* ---- sect succession crises ---- */
@@ -722,14 +832,18 @@ export function sysFactions() {
 /* a head's death without a clear heir can shatter a sect — the breakaway
    faction founds a rival house, seeding a future war (a Phase 2 causal chain). */
 function fractureSect(s, heir, rival, cause) {
+  const unorthodox = s.align === "unorthodox";
   const splinter = makeSect({ align: s.align, prestige: Math.round(s.prestige * 0.5) });
   splinter.signatureArt = s.signatureArt;
   splinter.founded = STATE.year;
   const living = s.members.map(figById).filter(x => x && x.alive);
   const moved = [];
+  /* unorthodox houses, having no rule of legitimacy, fragment harder —
+     crews follow the strongest arm, not the rightful seat */
+  const pullP = unorthodox ? 0.5 : 0.4;
   for (const f of living) {
     if (f === heir) continue;
-    if (f === rival || chance(.4)) {
+    if (f === rival || chance(pullP)) {
       s.members = s.members.filter(id => id !== f.id);
       f.sect = splinter; addToSect(splinter, f); moved.push(f);
     }
@@ -738,7 +852,9 @@ function fractureSect(s, heir, rival, cause) {
   s.headId = heir.id;
   STATE.sects.push(splinter);
   const ev = chron("c-schism",
-    `Succession strife splits ${sref(s)}: denied the seat of 장문인 that passed to ${ref(heir)}, ${ref(rival)} breaks away with ${moved.length} follower${moved.length === 1 ? "" : "s"} to found ${sref(splinter)}.`,
+    unorthodox
+      ? `Might makes the master: with no rule of legitimacy to bind it, ${sref(s)} splits along its strongest arms — ${ref(rival)} carves off ${moved.length} blade${moved.length === 1 ? "" : "s"} into a breakaway crew, ${sref(splinter)}, owing ${ref(heir)} nothing but contempt.`
+      : `Succession strife splits ${sref(s)}: denied the seat of 장문인 that passed to ${ref(heir)}, ${ref(rival)} breaks away with ${moved.length} follower${moved.length === 1 ? "" : "s"} to found ${sref(splinter)}.`,
     "major", [heir.id, rival.id], [s.id, splinter.id], cause);
   splinter.fallEvent = null;
   /* the schism births a mutual grudge — fuel for the wars to come */
@@ -759,14 +875,19 @@ export function sysSuccession() {
       if (head.id !== top.id && top.power > head.power * 1.4 && chance(.2)) s.headId = top.id;
       continue;
     }
-    /* the 장문인 has died — is there a clear heir? */
+    /* the 장문인 has died — is there a clear heir? orthodox seats turn on
+       legitimacy (bloodline, lineage, the elders' assent); unorthodox seats
+       turn on raw might alone, so a close contest splits the house. */
     const cause = head && head.fallEvent != null ? [head.fallEvent] : [];
-    const heirClear = top.realm >= 4 &&
-      (living.length < 2 || top.power >= living[1].power * 1.25) &&
-      (top.master === s.headId ||
-       (top.clan && head && head.clan && top.clan === head.clan) ||
-       chance(.4));
-    if (!heirClear && living.length >= 2 && chance(.55)) {
+    const unorthodox = s.align === "unorthodox";
+    const heirClear = unorthodox
+      ? (living.length < 2 || top.power >= living[1].power * 1.5)
+      : (top.realm >= 4 &&
+         (living.length < 2 || top.power >= living[1].power * 1.25) &&
+         (top.master === s.headId ||
+          (top.clan && head && head.clan && top.clan === head.clan) ||
+          chance(.4)));
+    if (!heirClear && living.length >= 2 && chance(unorthodox ? .65 : .55)) {
       fractureSect(s, top, living[1], cause);
     } else {
       s.headId = top.id;

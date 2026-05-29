@@ -4,19 +4,26 @@ import { renderLog, renderPanels, setAutoScroll } from './render.js';
 import { setFollow, clearFollow } from './follow.js';
 import { buildChainView } from './chain.js';
 import { buildTreeView } from './tree.js';
+import { loc } from './i18n.js';
+import { STATE } from './state.js';
 
 const $ = id => document.getElementById(id);
 
+let lastChainId = null;
+
 /* ---- chain reader ---- */
 function openChain(eid) {
-  $("chain-body").innerHTML = buildChainView(+eid);
+  lastChainId = +eid;
+  $("chain-body").innerHTML = loc(buildChainView(+eid));
   $("chain-overlay").style.display = 'flex';
 }
 function closeChain() { $("chain-overlay").style.display = 'none'; }
 
 /* ---- tree viewer ---- */
+let lastTreeId = null;
 function openTree(figId) {
-  $("tree-body").innerHTML = buildTreeView(+figId);
+  lastTreeId = +figId;
+  $("tree-body").innerHTML = loc(buildTreeView(+figId));
   $("tree-overlay").style.display = 'flex';
 }
 function closeTree() { $("tree-overlay").style.display = 'none'; }
@@ -42,6 +49,17 @@ $("pause").addEventListener("click", e => {
   e.target.textContent = paused ? "▶ Resume" : "❚❚ Pause";
 });
 $("reseed").addEventListener("click", () => start((Math.random() * 0xffffffff) >>> 0));
+$("hangul").addEventListener("click", e => {
+  STATE.showHangul = !STATE.showHangul;
+  e.target.classList.toggle("on", STATE.showHangul);
+  e.target.textContent = STATE.showHangul ? "한 Hangul: On" : "한 Hangul: Off";
+  document.body.classList.toggle("no-hangul", !STATE.showHangul);
+  STATE.dirtyLog = true; STATE.dirtyPanels = true;
+  renderLog(); renderPanels();
+  /* refresh whichever reader overlay is open so it re-localises too */
+  if ($("chain-overlay").style.display === 'flex' && lastChainId != null) openChain(lastChainId);
+  if ($("tree-overlay").style.display === 'flex' && lastTreeId != null) openTree(lastTreeId);
+});
 $("speed").addEventListener("click", e => {
   if (e.target.dataset.s) {
     speed = +e.target.dataset.s;

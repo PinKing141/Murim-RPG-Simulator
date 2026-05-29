@@ -2,8 +2,9 @@ import { clamp, cap } from './rng.js';
 import { ALIGN, REALMS, REALM_KR } from './data.js';
 import { STATE, aliveFigs, aliveSects, figById } from './state.js';
 import { sectMight, topMember } from './systems.js';
-import { aliveBlocs, blocById, sectBloc } from './factions.js';
+import { aliveBlocs, blocById, sectBloc, stanceLabel } from './factions.js';
 import { FOLLOW, buildFigDossier, buildSectDossier, buildBlocDossier } from './follow.js';
+import { loc } from './i18n.js';
 
 const $ = id => document.getElementById(id);
 export let autoScroll = true;
@@ -26,7 +27,7 @@ export function renderLog() {
   /* determine filter */
   let entries;
   const setBanner = (text) => {
-    banner.querySelector('.fb-text').innerHTML = text;
+    banner.querySelector('.fb-text').innerHTML = loc(text);
     banner.style.display = 'flex';
   };
 
@@ -78,7 +79,7 @@ export function renderLog() {
     const d = document.createElement("div");
     d.className = `entry ${e.cls} ${e.level === "major" ? "major" : ""} ${e.level === "epic" ? "epic major" : ""}${hasChain ? " has-chain" : ""}`;
     d.dataset.eid = e.id;
-    d.innerHTML = `<span class="txt"><span class="tag">${STATE.seasonNames[e.season]}</span>${e.html}${hasChain ? `<span class="chain-mark" title="Trace cause &amp; consequence">⛓</span>` : ""}</span>`;
+    d.innerHTML = `<span class="txt"><span class="tag">${STATE.seasonNames[e.season]}</span>${loc(e.html)}${hasChain ? `<span class="chain-mark" title="Trace cause &amp; consequence">⛓</span>` : ""}</span>`;
     frag.appendChild(d);
   }
   box.appendChild(frag);
@@ -110,17 +111,19 @@ export function renderPanels() {
       const al = ALIGN[b.align];
       const leader = b.leaderId != null ? figById(b.leaderId) : null;
       const ln = leader ? (leader.byeolho && leader.namedAt != null ? cap(leader.byeolho.en) : leader.name) : "—";
-      const title = b.type === "alliance" ? "맹주" : "교주";
+      const title = STATE.showHangul ? (b.type === "alliance" ? "맹주" : "교주")
+                                     : (b.type === "alliance" ? "Leader" : "Master");
+      const cohLabel = STATE.showHangul ? "결속" : "Cohesion";
       const isF = FOLLOW.kind === "bloc" && FOLLOW.id === b.id;
       const card = document.createElement("div");
       card.className = "bloc-card" + (isF ? " followed" : "");
       card.dataset.id = b.id;
       card.style.setProperty("--c", al.c);
-      card.innerHTML = `
+      card.innerHTML = loc(`
         <div class="bloc-name">${b.kr}<span class="en">${b.name.replace(/^the /, "")}</span></div>
         <div class="bloc-meta"><span>${title}: <b>${ln}</b></span><span>${b.memberSects.length} sects</span></div>
-        <div class="bloc-coh"><span>결속</span><div class="mini"><i style="width:${clamp(b.cohesion,0,100)}%;background:${al.c}"></i></div></div>
-      `;
+        <div class="bloc-coh"><span>${cohLabel}</span><div class="mini"><i style="width:${clamp(b.cohesion,0,100)}%;background:${al.c}"></i></div></div>
+      `);
       bl.appendChild(card);
     }
   }
@@ -141,19 +144,23 @@ export function renderPanels() {
     div.style.setProperty("--c", al.c);
     const leadName = lead ? (lead.byeolho && lead.namedAt != null ? cap(lead.byeolho.en) : lead.name) : "";
     const sb = s.alive ? sectBloc(s.id) : null;
-    div.innerHTML = `
+    const tier = STATE.showHangul ? al.kr : al.label;
+    const blocTag = sb ? (STATE.showHangul ? `${sb.type === "alliance" ? "盟" : "敎"} ${sb.kr}`
+                                            : `${sb.type === "alliance" ? "盟" : "敎"} ${sb.name.replace(/^the /, "")}`) : "";
+    div.innerHTML = loc(`
       <div class="sect-head">
         <div class="sect-name">${s.kr}<span class="en">${s.name}</span></div>
-        <div class="sect-tier">${al.kr}</div>
+        <div class="sect-tier">${tier}</div>
       </div>
       <div class="sect-meta">
         <span><b>${living.length}</b> disciples</span>
         <span>${s.region.replace("the ","").replace(/\s*\(.*\)/,"")}</span>
       </div>
-      ${lead ? `<div class="sect-meta"><span>Head: <b>${leadName}</b> · ${REALM_KR[lead.realm]}</span></div>` : ""}
-      ${sb ? `<div class="sect-bloc" style="--bc:${ALIGN[sb.align].c}">${sb.type === "alliance" ? "盟" : "敎"} ${sb.kr}</div>` : ""}
+      ${lead ? `<div class="sect-meta"><span>Head: <b>${leadName}</b> · ${STATE.showHangul ? REALM_KR[lead.realm] : REALMS[lead.realm]}</span></div>` : ""}
+      ${sb ? `<div class="sect-bloc" style="--bc:${ALIGN[sb.align].c}">${blocTag}</div>` : ""}
+      ${s.alive && s.align === "unorthodox" ? `<div class="sect-stance">↔ ${stanceLabel(s.stance)}</div>` : ""}
       <div class="pbar"><i style="width:${clamp(s.prestige,0,100)}%"></i></div>
-    `;
+    `);
     sl.appendChild(div);
   }
 
@@ -165,17 +172,17 @@ export function renderPanels() {
     const f = figById(FOLLOW.id);
     figPanel.style.display = 'none';
     dossierWrap.style.display = 'block';
-    dossierWrap.innerHTML = f ? buildFigDossier(f) : '<div class="dos-empty">Figure not found.</div>';
+    dossierWrap.innerHTML = f ? loc(buildFigDossier(f)) : '<div class="dos-empty">Figure not found.</div>';
   } else if (FOLLOW.kind === 'sect') {
     const s = STATE.sects.find(x => x.id === FOLLOW.id);
     figPanel.style.display = 'none';
     dossierWrap.style.display = 'block';
-    dossierWrap.innerHTML = s ? buildSectDossier(s) : '<div class="dos-empty">Sect not found.</div>';
+    dossierWrap.innerHTML = s ? loc(buildSectDossier(s)) : '<div class="dos-empty">Sect not found.</div>';
   } else if (FOLLOW.kind === 'bloc') {
     const b = blocById(FOLLOW.id);
     figPanel.style.display = 'none';
     dossierWrap.style.display = 'block';
-    dossierWrap.innerHTML = b ? buildBlocDossier(b) : '<div class="dos-empty">Bloc not found.</div>';
+    dossierWrap.innerHTML = b ? loc(buildBlocDossier(b)) : '<div class="dos-empty">Bloc not found.</div>';
   } else {
     figPanel.style.display = '';
     dossierWrap.style.display = 'none';
@@ -191,17 +198,20 @@ export function renderPanels() {
       div.dataset.id = f.id;
       div.style.setProperty("--c", al.c);
       const named = f.byeolho && f.namedAt != null;
-      div.innerHTML = `
+      const lbl = STATE.showHangul
+        ? { pw: "내공", fm: "명성", ki: "마기" }
+        : { pw: "Power", fm: "Fame", ki: "Ki" };
+      div.innerHTML = loc(`
         <div class="fig-name">${named ? `<span class="fig-alias">${cap(f.byeolho.en)} · ${f.byeolho.kr}</span>` : f.name}</div>
         <div class="fig-sub">${named ? f.name + " · " : ""}${al.label}${f.isThreat ? ` · <span style="color:var(--blood)">천마 HEAVENLY DEMON</span>` : ""}${f.sect ? " · " + f.sect.name : " · wanderer"}</div>
         <span class="fig-realm">${REALMS[f.realm]} · ${REALM_KR[f.realm]}</span>
         <div class="fig-bars">
-          <span>내공</span>${bar(f.power, 1100, al.c)}
-          <span>명성</span>${bar(f.fame, 60, "var(--gold)")}
-          <span>마기</span>${bar(f.alignmentDrift, 100, "var(--magyo)")}
+          <span>${lbl.pw}</span>${bar(f.power, 1100, al.c)}
+          <span>${lbl.fm}</span>${bar(f.fame, 60, "var(--gold)")}
+          <span>${lbl.ki}</span>${bar(f.alignmentDrift, 100, "var(--magyo)")}
         </div>
         ${f.art ? `<div class="fig-sub" style="margin-top:6px">${f.art.name} (${f.art.kr}) · tier ${f.art.tier}</div>` : ""}
-      `;
+      `);
       fl.appendChild(div);
     }
   }

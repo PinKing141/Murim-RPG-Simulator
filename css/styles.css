@@ -505,3 +505,33 @@ button.ctl.primary:hover { box-shadow: 0 0 16px rgba(201,162,39,.25); }
 .taint-low  .dos-role { color: var(--sapa); }
 .taint-mid  .dos-role { color: var(--blood); }
 .taint-high .dos-role { color: #9b59b6; }
+
+/* ---- Hangul toggle ---- */
+.no-hangul .kr,
+.no-hangul .krt,
+.no-hangul .chain-title-kr,
+.no-hangul .tree-modal-title-kr { display: none; }
+/* chips that become empty once their Hangul label is stripped */
+.no-hangul .sect-tier:empty,
+.no-hangul .bloc-name:empty,
+.no-hangul .dos-kr:empty,
+.no-hangul .tree-kr:empty { display: none; }
+#hangul.on { color: var(--gold); border-color: var(--gold); }
+
+/* ---- unorthodox stance / institutional memory ---- */
+.dos-stance { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.dos-stance .stance-track {
+  flex: 1; height: 6px; border-radius: 3px; position: relative;
+  background: linear-gradient(90deg, var(--magyo), #555 50%, var(--jeongpa));
+  opacity: .55;
+}
+.dos-stance .stance-pin {
+  position: absolute; top: -3px; width: 3px; height: 12px;
+  background: var(--ink); border-radius: 1px; transform: translateX(-50%);
+}
+.dos-stance .stance-lbl { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-dim); }
+.dos-wounds .dos-role { color: var(--sapa); }
+.sect-stance {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  color: var(--ink-faint); margin-top: 2px;
+}

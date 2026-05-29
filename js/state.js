@@ -12,7 +12,8 @@ export const STATE = {
   log: [], eventIndex: new Map(), figIndex: new Map(),
   dirtyLog: true, dirtyPanels: true,
   activeWars: [], threatActive: false, lastThreatFall: null,
-  cultCooldownUntil: 0, threatCooldownUntil: 0, seed: 0
+  cultCooldownUntil: 0, threatCooldownUntil: 0, seed: 0,
+  showHangul: true
 };
 
 export function newId()    { return STATE.idc++; }
@@ -132,7 +133,16 @@ export function makeSect(opts = {}) {
     headId: null,
     alive: true, deadYear: null,
     fallEvent: null,
-    atWarWith: []
+    atWarWith: [],
+    /* the unorthodox middle — a sect's standing posture in bloc politics.
+       stance runs -100 (firmly cult-leaning) … 0 (stubbornly neutral) …
+       +100 (firmly alliance-leaning). Only meaningful for 사파 sects. */
+    stance: opts.stance != null ? opts.stance : (align === "unorthodox" ? ri(-25, 25) : 0),
+    blocGrudges: [],          // institutional memory: [{blocId, blocType, reason, event, year}]
+    coerced: false,           // strong-armed into its current bloc?
+    joinedBlocYear: null,
+    loyalYears: 0,
+    marriedOrthodox: false    // has it intermarried into an orthodox house?
   };
 }
 
