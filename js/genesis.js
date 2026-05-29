@@ -1,5 +1,6 @@
 import { RNG, makeRNG, ri, pick, chance } from './rng.js';
-import { STATE, makeArt, makeSect, makeFigure, addToSect, aliveSects } from './state.js';
+import { REGIONS, TERRAIN } from './data.js';
+import { STATE, makeArt, makeSect, makeFigure, addToSect, aliveSects, makeRegion, regionByName } from './state.js';
 import { chron, ref, sref, aref } from './chronicle.js';
 import { maybeName } from './systems.js';
 
@@ -8,12 +9,15 @@ export function genesis(seed) {
   Object.assign(STATE, {
     idc: 1, evc: 1, year: 1, season: 0,
     seasonNames: ["Spring","Summer","Autumn","Winter"],
-    figures: [], sects: [], arts: [], blocs: [],
+    figures: [], sects: [], arts: [], blocs: [], regions: [],
     log: [], eventIndex: new Map(), figIndex: new Map(),
     dirtyLog: true, dirtyPanels: true,
     activeWars: [], threatActive: false, lastThreatFall: null,
     cultCooldownUntil: 0, threatCooldownUntil: 0, seed
   });
+
+  /* the mortal world first — terrain and the civilisation it sustains */
+  for (const name of REGIONS) STATE.regions.push(makeRegion(name));
 
   const nArt = ri(5, 7);
   for (let i = 0; i < nArt; i++)
@@ -21,7 +25,15 @@ export function genesis(seed) {
 
   const nSect = ri(5, 7);
   for (let i = 0; i < nSect; i++) {
-    const s = makeSect();
+    /* a house takes root in a region, and the land shapes what it becomes */
+    const region = pick(STATE.regions);
+    let align;
+    if (chance(.6)) {
+      align = TERRAIN[region.terrain].align;
+      if (align === "recluse") align = chance(.5) ? "orthodox" : "recluse";
+    }
+    const s = makeSect({ region: region.name, align });
+    region.prosperity = Math.min(100, region.prosperity + ri(4, 10));   // a sect enriches its seat
     STATE.sects.push(s);
     const cand = STATE.arts.filter(a => !a.lost && a.align === s.align);
     s.signatureArt = cand.length ? pick(cand) : pick(STATE.arts);

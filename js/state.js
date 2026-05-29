@@ -1,14 +1,14 @@
-import { rand, ri, pick, chance } from './rng.js';
+import { rand, ri, pick, chance, clamp } from './rng.js';
 import {
   SURNAMES, CLAN_SURNAMES, GIVEN,
   BH_PRE, BH_SUF, SECT_PRE, SECT_SUF, ART_PRE, ART_SUF,
-  REGIONS
+  REGIONS, TERRAIN, REGION_TERRAIN
 } from './data.js';
 
 export const STATE = {
   idc: 1, evc: 1, year: 1, season: 0,
   seasonNames: ["Spring","Summer","Autumn","Winter"],
-  figures: [], sects: [], arts: [], blocs: [],
+  figures: [], sects: [], arts: [], blocs: [], regions: [],
   log: [], eventIndex: new Map(), figIndex: new Map(),
   dirtyLog: true, dirtyPanels: true,
   activeWars: [], threatActive: false, lastThreatFall: null,
@@ -91,6 +91,10 @@ export function makeFigure(opts = {}) {
     age: opts.age != null ? opts.age : ri(14, 22),
     lifespan: 0, power: 0,
     fame: opts.fame || ri(0, 8),
+    /* charisma — the gift of being followed. It is not strength; it is why
+       people swear oaths, raise you as 맹주, or forgive a thin claim. It feeds
+       fame, legitimacy, and bloc leadership rather than combat. */
+    charisma: opts.charisma != null ? opts.charisma : clamp(ri(8, 64) + (clan ? 12 : 0), 0, 100),
     alignmentDrift: align === "demonic" ? ri(40,65) : align === "unorthodox" ? ri(20,40) : ri(0,15),
     sect: opts.sect || null,
     art: opts.art || null,
@@ -142,9 +146,31 @@ export function makeSect(opts = {}) {
     coerced: false,           // strong-armed into its current bloc?
     joinedBlocYear: null,
     loyalYears: 0,
-    marriedOrthodox: false    // has it intermarried into an orthodox house?
+    marriedOrthodox: false,   // has it intermarried into an orthodox house?
+    /* institutional authority, separate from power. Lets weak-but-legitimate
+       houses outlast strong-but-illegitimate ones. */
+    legitimacy: opts.legitimacy != null ? opts.legitimacy : ri(35, 62),
+    /* ideological strain: debt accrued by surviving through forbidden means,
+       and pressure from non-conformist disciples the doctrine can't contain. */
+    doctrinalDebt: 0,
+    reformLean: 0,
+    patron: false             // accepted imperial court patronage?
   };
 }
+
+export function makeRegion(name) {
+  const key = REGION_TERRAIN[name] || "forest";
+  const t = TERRAIN[key];
+  const span = ([lo, hi]) => ri(lo, hi);
+  return {
+    kind: "region", name, terrain: key,
+    population: span(t.population),
+    prosperity: span(t.prosperity),
+    stability: span(t.stability),
+    peakPop: 0, scarYear: null, era: "settled"
+  };
+}
+export const regionByName = name => STATE.regions.find(r => r.name === name) || null;
 
 export const aliveFigs  = () => STATE.figures.filter(f => f.alive);
 export const aliveSects = () => STATE.sects.filter(s => s.alive);

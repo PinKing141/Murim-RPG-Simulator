@@ -45,6 +45,34 @@ export const ART_SUF = [
 ];
 
 export const REGIONS = ["the Central Plains (중원)","the Southern Marches","the Sacheon basin","the Frostbound North","the Misted East","the Demonic Frontier (새외)","the Imperial Capital","the Jade Coast","the Ten-Thousand Peaks","the Bleak Steppe"];
+
+/*
+  Terrain is the substrate the martial world grows inside. Each region carries
+  three scalars — population, prosperity, stability — and no simulated villagers;
+  the mortal world exists as the numbers murim bends. Terrain biases those
+  scalars, the quality of recruits a region yields, and the alignment of sects
+  that take root there.
+*/
+export const TERRAIN = {
+  river:    { kr:"강", label:"River Valley", prosperity:[55,82], stability:[55,78], population:[60,92], talent:[22,68], drift:-2, align:"orthodox" },
+  mountain: { kr:"산", label:"Mountain",     prosperity:[24,46], stability:[52,74], population:[24,46], talent:[34,82], drift: 0, align:"recluse"  },
+  forest:   { kr:"림", label:"Forest",       prosperity:[34,56], stability:[34,56], population:[30,56], talent:[28,76], drift: 2, align:"unorthodox" },
+  frontier: { kr:"새", label:"Frontier",     prosperity:[18,40], stability:[18,40], population:[20,46], talent:[40,92], drift: 6, align:"demonic" }
+};
+
+export const REGION_TERRAIN = {
+  "the Central Plains (중원)":"river",
+  "the Southern Marches":"forest",
+  "the Sacheon basin":"river",
+  "the Frostbound North":"mountain",
+  "the Misted East":"forest",
+  "the Demonic Frontier (새외)":"frontier",
+  "the Imperial Capital":"river",
+  "the Jade Coast":"river",
+  "the Ten-Thousand Peaks":"mountain",
+  "the Bleak Steppe":"frontier"
+};
+export const IMPERIAL_REGION = "the Imperial Capital";
 export const WAR_NAMES = [
   ["the Great Orthodox-Demon War","정마대전"],["the Blood Calamity","무림혈겁"],
   ["the Ten-Year War","십년대전"],["the Struggle for Supremacy","천하쟁패"],

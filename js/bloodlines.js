@@ -150,9 +150,12 @@ export function makeChild(pA, pB) {
   const sect = (carrier.sect && carrier.sect.alive) ? carrier.sect
     : (other.sect && other.sect.alive) ? other.sect : null;
 
+  /* the gift of presence runs in the blood as surely as talent does */
+  const charisma = clamp(Math.round((pA.charisma + pB.charisma) / 2 + ri(-12, 12)), 0, 100);
+
   const child = makeFigure({
     name, clan, align,
-    talent, realm: 0, age: 0,
+    talent, charisma, realm: 0, age: 0,
     sect,
     parents: [pA.id, pB.id],
     gen: Math.max(pA.gen, pB.gen) + 1,

@@ -1,6 +1,6 @@
 import { rand, ri, pick, chance, clamp, cap } from './rng.js';
-import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN } from './data.js';
-import { STATE, aliveFigs, aliveSects, figById, makeFigure, makeSect, addToSect, recomputeLife, recomputePower, makeByeolho } from './state.js';
+import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN, TERRAIN, REGION_TERRAIN, IMPERIAL_REGION } from './data.js';
+import { STATE, aliveFigs, aliveSects, figById, makeFigure, makeSect, addToSect, recomputeLife, recomputePower, makeByeolho, regionByName } from './state.js';
 import { chron, ref, plainRef, sref, aref, bref } from './chronicle.js';
 import {
   addGrudge, decayGrudges, bloodGrudges, dropGrudge, inheritGrudgesOnDeath,
@@ -8,13 +8,39 @@ import {
 } from './bloodlines.js';
 import {
   makeBloc, aliveBlocs, allianceBloc, cultBloc, sectBloc,
-  blocLeader, blocSects, strongestIn,
+  blocLeader, blocSects, strongestIn, bestLeaderIn,
   addBlocGrudge, blocGrudgeAgainst
 } from './factions.js';
 
+/* nudge a sect's institutional authority, kept in bounds */
+function legit(s, d) { if (s) s.legitimacy = clamp(s.legitimacy + d, 0, 100); }
+
+/* war, terror and famine bleed a region's people and order */
+function scarRegion(r, popHit, stabHit) {
+  if (!r) return;
+  r.population = clamp(r.population - popHit, 0, 100);
+  r.stability  = clamp(r.stability - stabHit, 0, 100);
+  r.scarYear = STATE.year;
+}
+
+/* the calibre and temperament of disciples a sect's home region yields */
+function recruitTraits(s) {
+  const r = regionByName(s.region);
+  const t = r ? TERRAIN[r.terrain] : null;
+  let lo = 15, hi = 72, drift = 0;
+  if (t) {
+    lo = t.talent[0]; hi = t.talent[1]; drift = t.drift;
+    const pf = (r.prosperity - 50) / 50;              // prosperity lifts the floor
+    lo = clamp(Math.round(lo + pf * 8), 8, hi - 5);
+  }
+  return { talent: ri(lo, hi), drift };
+}
+
 export function maybeName(f, force, causes = []) {
   if (f.namedAt != null) return null;
-  if (force || (f.realm >= 3 && f.fame >= 14)) {
+  /* the charismatic win a name on thinner deeds; the colourless need more */
+  const fameNeed = clamp(18 - (f.charisma || 0) / 10, 9, 18);
+  if (force || (f.realm >= 3 && f.fame >= fameNeed)) {
     f.byeolho = makeByeolho();
     f.namedAt = STATE.year;
     return chron("c-rise",
@@ -39,7 +65,14 @@ export function alignShift(f, amount, reason, causes = []) {
         `${ref(f)} has fallen to the Demonic Path (마도)${reason ? " — " + reason : ""}. The energy about them turns cold and ravenous.`,
         "major", [f.id], [], causes);
       f.fallEvent = ev.id;
+      /* a righteous house that harbours a fallen disciple carries the shame —
+         and the ideological debt that one day demands purification */
+      if (f.sect && f.sect.alive && (f.sect.align === "orthodox" || sectBloc(f.sect.id)?.type === "alliance")) {
+        f.sect.doctrinalDebt += ri(8, 16);
+        legit(f.sect, -ri(3, 7));
+      }
     } else if (na === "unorthodox" && before === "orthodox") {
+      if (f.sect && f.sect.alive && f.sect.align === "orthodox") f.sect.doctrinalDebt += ri(3, 7);
       chron("c-corrupt",
         `${ref(f)} forsakes the orthodox canon for unorthodox methods${reason ? " after " + reason : ""}.`,
         "normal", [f.id], [], causes);
@@ -145,6 +178,9 @@ function endWar(w, A, B, winner, loser) {
   if (B) B.atWarWith = B.atWarWith.filter(id => !A || id !== A.id);
   if (winner && loser) {
     winner.prestige += ri(8, 18); loser.prestige -= ri(15, 30);
+    legit(winner, ri(4, 9)); legit(loser, -ri(6, 12));   // victory is its own claim to authority
+    /* war scars the land it is fought over — population and order both bleed */
+    for (const s of [winner, loser]) scarRegion(regionByName(s.region), ri(8, 16), ri(6, 12), w.startEvent);
     const ev = chron("c-war",
       `${w.name} (${w.kr}) ends. ${sref(winner)} stands victorious; ${sref(loser)} is broken and humbled.`,
       "major", [], [winner.id, loser.id], w.startEvent != null ? [w.startEvent] : []);
@@ -186,7 +222,7 @@ export function sysCultivation() {
 
 export function sysFame() {
   for (const f of aliveFigs()) {
-    if (chance(.04)) { f.fame += rand() * 2; maybeName(f); }
+    if (chance(.04)) { f.fame += rand() * 2 * (1 + (f.charisma || 0) / 120); maybeName(f); }
   }
 }
 
@@ -203,15 +239,21 @@ export function sysAging() {
 export function sysRecruitment() {
   for (const s of aliveSects()) {
     const living = s.members.map(figById).filter(x => x && x.alive);
+    const r = regionByName(s.region);
+    const recruitP = clamp(0.18 + (r ? r.prosperity / 250 : 0.14), 0.08, 0.6);
     if (living.length < 3) {
       for (let i = 0; i < ri(1, 2); i++) {
-        const f = makeFigure({ align: s.align, sect: s, art: s.signatureArt, realm: 0, age: ri(13,18), talent: ri(15,70) });
+        const tr = recruitTraits(s);
+        const f = makeFigure({ align: s.align, sect: s, art: s.signatureArt, realm: 0, age: ri(13,18), talent: tr.talent });
+        if (tr.drift) f.alignmentDrift = clamp(f.alignmentDrift + tr.drift, 0, 100);
         addToSect(s, f); STATE.figures.push(f);
         if (s.signatureArt) s.signatureArt.holders++;
       }
-    } else if (chance(.35) && living.length < 14) {
+    } else if (chance(recruitP) && living.length < 14) {
       const master = pick(living.filter(x => x.realm >= 3)) || pick(living);
-      const f = makeFigure({ align: s.align, sect: s, art: s.signatureArt, realm: 0, age: ri(12,17), talent: ri(15,75), master: master ? master.id : null });
+      const tr = recruitTraits(s);
+      const f = makeFigure({ align: s.align, sect: s, art: s.signatureArt, realm: 0, age: ri(12,17), talent: tr.talent, master: master ? master.id : null });
+      if (tr.drift) f.alignmentDrift = clamp(f.alignmentDrift + tr.drift, 0, 100);
       addToSect(s, f); STATE.figures.push(f);
       if (s.signatureArt) s.signatureArt.holders++;
       if (f.talent >= 68) {
@@ -312,7 +354,10 @@ export function sysCorruptionAndThreat() {
         const threatCause = threat.ascendEvent != null ? [threat.ascendEvent] : [];
         if (champ.power > threat.power * 0.85 && chance(.5)) {
           const death = killFigure(threat, `is at last cut down by ${champ.byeolho ? cap(champ.byeolho.en) : champ.name} and the orthodox alliance (무림맹)`, threatCause, champ.id);
-          champ.fame += 20; maybeName(champ);
+          champ.fame += 20; champ.charisma = clamp(champ.charisma + ri(4, 10), 0, 100);
+          legit(champ.sect, ri(10, 20));
+          const ab = allianceBloc(); if (ab) ab.legitimacy = clamp(ab.legitimacy + ri(8, 16), 0, 100);
+          maybeName(champ);
           chron("c-rise",
             `${ref(champ)} is hailed across the Murim as the hero who slew the Heavenly Demon.`,
             "major", [champ.id], [], death ? [death.id] : []);
@@ -361,6 +406,7 @@ export function sysLostAndFound() {
 export function sysSectFortune() {
   for (const s of aliveSects()) {
     s.prestige = clamp(s.prestige + (rand() - 0.45) * 4, 0, 100);
+    s.legitimacy = clamp(s.legitimacy + (50 - s.legitimacy) * 0.01, 0, 100);   // authority drifts toward the mean
     if (s.prestige <= 4 && chance(.5)) dissolveSect(s, "withered into obscurity, its halls left empty");
   }
   if (aliveSects().length < 7 && chance(.16)) {
@@ -543,7 +589,9 @@ function ensureBlocLeader(b) {
   const leader = blocLeader(b);
   if (leader && leader.alive) return;
   const sects = blocSects(b);
-  const best = strongestIn(sects);
+  /* the alliance raises its 맹주 on legitimacy and presence; the cult's
+     throne goes to whoever is strongest enough to hold it */
+  const best = b.type === "alliance" ? bestLeaderIn(sects) : strongestIn(sects);
   if (!best) return;
   const prevRef = leader ? ref(leader) : "the empty throne";
   const cause = leader && leader.fallEvent != null ? [leader.fallEvent] : [];
@@ -552,13 +600,16 @@ function ensureBlocLeader(b) {
   if (b.type === "cult") {
     b.threatLed = !!best.f.isThreat;
     b.cohesion = clamp(b.cohesion - ri(12, 26), 0, 100);
+    /* a throne seized by force, not granted — legitimacy rests on raw charisma */
+    b.legitimacy = clamp(Math.round((best.f.charisma + best.f.power / 20) / 2), 0, 80);
     const ev = chron("c-faction",
       `The throne of ${bref(b)} falls vacant${leader ? ` with ${prevRef} slain` : ""}; ${ref(best.f)} seizes the title of 교주 in the succession struggle that follows.`,
       "major", [best.f.id], b.memberSects, cause);
     const rival = sects.flatMap(s => s.members.map(figById))
       .filter(x => x && x.alive && x.id !== best.f.id && x.realm >= 5)
       .sort((a, c) => c.power - a.power)[0];
-    if (rival && chance(.6)) {
+    /* the weaker a new 교주's legitimacy, the more blood the throne demands */
+    if (rival && chance(0.4 + (100 - b.legitimacy) / 250)) {
       killFigure(rival, "", [ev.id], best.f.id, {
         cls: "c-schism",
         html: `${ref(rival)}, who contested the throne of ${bref(b)}, is purged by the new 교주 ${ref(best.f)}.`,
@@ -566,8 +617,12 @@ function ensureBlocLeader(b) {
       });
     }
   } else {
+    b.legitimacy = clamp(Math.round((best.s.legitimacy + best.f.charisma) / 2), 0, 100);
+    const contested = best.f.charisma < 42 && sects.length >= 3;
     chron("c-faction",
-      `With ${prevRef} fallen, the sects of ${bref(b)} raise ${ref(best.f)} of ${sref(best.s)} as the new 맹주.`,
+      contested
+        ? `With ${prevRef} fallen, the sects of ${bref(b)} reluctantly raise ${ref(best.f)} of ${sref(best.s)} as 맹주 — the strongest blade, though few are warmed by the choice.`
+        : `With ${prevRef} fallen, the sects of ${bref(b)} raise ${ref(best.f)} of ${sref(best.s)} as the new 맹주.`,
       "major", [best.f.id], b.memberSects, cause);
   }
   best.f.fame += 8; maybeName(best.f);
@@ -702,7 +757,7 @@ export function sysFactions() {
     const demonic = aliveSects().filter(s => s.align === "demonic");
     const canUnion = demonic.length >= 3 && chance(.15);
     if (threat || canUnion) {
-      const led = threat || (strongestIn(demonic) || {}).f;
+      const led = threat || (bestLeaderIn(demonic) || {}).f;
       if (led) {
         const b = makeBloc("cult", "demonic",
           threat ? "the Heavenly Demon Cult" : "the Demonic Union",
@@ -726,11 +781,12 @@ export function sysFactions() {
   /* the orthodox sects swear the oath of the Murim Alliance against the demonic tide */
   if (!allianceBloc() && (cultBloc() || threatActive)) {
     const orthodox = aliveSects().filter(s => s.align === "orthodox");
-    const best = strongestIn(orthodox);
+    const best = bestLeaderIn(orthodox);
     if (orthodox.length >= 2 && best) {
       const b = makeBloc("alliance", "orthodox", "the Murim Alliance", "무림맹");
       b.memberSects = orthodox.map(s => s.id);
       b.leaderId = best.f.id; b.leaderSectId = best.s.id;
+      b.legitimacy = clamp(Math.round((best.s.legitimacy + best.f.charisma) / 2), 0, 100);
       const cult = cultBloc();
       if (cult) { b.rivalId = cult.id; cult.rivalId = b.id; }
       STATE.blocs.push(b);
@@ -850,6 +906,9 @@ function fractureSect(s, heir, rival, cause) {
   }
   rival.sect = splinter; splinter.headId = rival.id;
   s.headId = heir.id;
+  /* a house that splits squanders the authority both halves once shared */
+  legit(s, -ri(8, 15));
+  splinter.legitimacy = clamp(s.legitimacy - ri(5, 12), 0, 100);
   STATE.sects.push(splinter);
   const ev = chron("c-schism",
     unorthodox
@@ -887,15 +946,168 @@ export function sysSuccession() {
          (top.master === s.headId ||
           (top.clan && head && head.clan && top.clan === head.clan) ||
           chance(.4)));
-    if (!heirClear && living.length >= 2 && chance(unorthodox ? .65 : .55)) {
+    /* legitimacy is leadership continuity made durable: a respected house
+       holds together through a murky succession; a hollow one shatters */
+    const fractureP = (unorthodox ? .65 : .55) * clamp(1.25 - s.legitimacy / 120, 0.3, 1.3);
+    if (!heirClear && living.length >= 2 && chance(fractureP)) {
       fractureSect(s, top, living[1], cause);
     } else {
       s.headId = top.id;
+      legit(s, ri(2, 5));   // an orderly handover affirms the house's authority
       if (top.realm >= 4 && chance(.5)) {
         chron("c-faction",
           `${ref(top)} succeeds as 장문인 of ${sref(s)}, taking up the seat left empty${head ? ` by ${ref(head)}` : ""}.`,
           "normal", [top.id], [s.id], cause);
       }
+    }
+  }
+}
+
+/* ---- the mortal world: regions as the substrate murim grows inside ---- */
+
+const mid = a => (a[0] + a[1]) / 2;
+
+function classifyRegion(r) {
+  let era = "settled";
+  if (r.population < 22) era = "emptying";
+  else if (r.stability < 35) era = "scarred";
+  else if (r.prosperity > 76 && r.stability > 68) era = "flourishing";
+  if (era === r.era) return;
+  const prev = r.era; r.era = era;
+  if (STATE.year - (r.lastEraYear || 0) < 10) return;   // hysteresis against churn
+  if (era === "settled" && prev !== "scarred" && prev !== "emptying") return;
+  r.lastEraYear = STATE.year;
+  const name = cap(r.name);
+  const msg = {
+    flourishing: `${name} flourishes — its markets swell and its villages send their gifted children to the sects.`,
+    scarred:     `${name} lies scarred, its fields fallow and its people wary of every passing blade.`,
+    emptying:    `${name} is emptying; those who can flee do, and only the desperate remain.`,
+    settled:     `${name} settles into an uneasy quiet once more, its people drifting back to the fields.`
+  }[era];
+  chron("c-region", msg, era === "settled" ? "normal" : "major", [], []);
+}
+
+function pickTerrorRegion(cult) {
+  const leader = cult ? blocLeader(cult) : null;
+  if (leader && leader.sect) { const r = regionByName(leader.sect.region); if (r) return r; }
+  const wild = STATE.regions.filter(r => r.terrain === "frontier" || r.terrain === "forest");
+  return pick(wild.length ? wild : STATE.regions);
+}
+
+/* the dispossessed of a ruined region drift into the Gangho carrying talent
+   and a grudge — tomorrow's unorthodox blades and demonic prodigies */
+function spawnRefugee(r) {
+  const f = makeFigure({ align: chance(.5) ? "unorthodox" : "demonic", realm: ri(0, 1), age: ri(14, 22), talent: ri(48, 93) });
+  f.alignmentDrift = clamp(f.alignmentDrift + ri(8, 22), 0, 100);
+  STATE.figures.push(f);
+  if (chance(.5)) {
+    chron("c-region",
+      `Out of the ruin of ${r.name}, a ${pick(["orphaned","dispossessed","vengeful","half-starved"])} child named ${plainRef(f)} drifts into the Gangho with nothing but a grudge against the world.`,
+      "normal", [f.id], []);
+  }
+}
+
+export function sysRegions() {
+  const cult = cultBloc();
+  for (const r of STATE.regions) {
+    const t = TERRAIN[r.terrain];
+    r.stability  += (mid(t.stability)  - r.stability)  * 0.04;
+    r.prosperity += (mid(t.prosperity) - r.prosperity) * 0.03;
+    /* population settles toward what the land's prosperity and order can carry,
+       so a scarred region recovers rather than emptying forever */
+    const carrying = (r.prosperity + r.stability) / 2;
+    r.population = clamp(r.population + (carrying - r.population) * 0.05, 0, 100);
+    r.peakPop = Math.max(r.peakPop, r.population);
+    classifyRegion(r);
+  }
+  /* a Heavenly Demon or a standing cult terrorises the land it touches */
+  if ((STATE.threatActive || (cult && cult.alive)) && chance(.5)) {
+    const target = pickTerrorRegion(cult);
+    if (target) {
+      scarRegion(target, ri(5, 12), ri(6, 14));
+      if (chance(.4)) spawnRefugee(target);
+    }
+  }
+  /* a sect's authority is anchored to the health of the seat it holds */
+  for (const s of aliveSects()) {
+    const r = regionByName(s.region);
+    if (!r) continue;
+    if (r.stability > 65 && chance(.1)) legit(s, 1);
+    else if (r.stability < 28 && chance(.15)) legit(s, -1);
+  }
+}
+
+/* ---- ideology: the fault lines that turn doctrine into history ---- */
+
+export function sysIdeology() {
+  for (const s of aliveSects()) {
+    const living = s.members.map(figById).filter(x => x && x.alive);
+
+    /* a righteous house quietly accrues debt for every disciple whose ki has
+       strayed toward the demonic but whom it has not cast out */
+    if (s.align === "orthodox") {
+      const strayed = living.filter(f => f.alignmentDrift > 52).length;
+      if (strayed) s.doctrinalDebt += strayed * 0.8;
+    }
+
+    /* doctrinal debt — a righteous house that survived by harbouring forbidden
+       power must one day reckon with it: purge (if it still has the standing) or schism */
+    if (s.align === "orthodox" && s.doctrinalDebt >= 24 && chance(.3)) {
+      const tainted = living.filter(f => f.align !== "orthodox" || f.alignmentDrift > 45)
+                            .sort((a, b) => b.alignmentDrift - a.alignmentDrift);
+      if (s.legitimacy >= 45 && tainted.length) {
+        const v = tainted[0];
+        const ev = chron("c-schism",
+          `The elders of ${sref(s)} move to cleanse the house: ${ref(v)}, whose methods strayed from the canon, is cast out to settle the debt of doctrine.`,
+          "major", [v.id], [s.id]);
+        v.sect = null; s.members = s.members.filter(id => id !== v.id);
+        if (s.headId && s.headId !== v.id) addGrudge(v, s.headId, { event: ev.id });
+        s.doctrinalDebt = Math.max(0, s.doctrinalDebt - ri(20, 35));
+        legit(s, ri(3, 7));
+      } else if (tainted.length >= 2 && living.length >= 2) {
+        const heir = living.find(f => f.align === "orthodox") || living[0];
+        const rebel = tainted.find(f => f !== heir) || tainted[0];
+        if (heir !== rebel) { fractureSect(s, heir, rebel, []); s.doctrinalDebt = 0; }
+      }
+    }
+    s.doctrinalDebt = Math.max(0, s.doctrinalDebt - 0.5);
+
+    /* reform vs tradition — a renowned non-conformist forces the house's hand */
+    const reformer = living.find(f => f.realm >= 4 && f.namedAt != null && !f.reformChecked &&
+      ((f.art && f.art.corruption > 40) || (s.align === "orthodox" && f.align !== "orthodox")));
+    if (reformer) {
+      reformer.reformChecked = true;
+      if (s.legitimacy >= 55 && chance(.5)) {
+        const ev = chron("c-corrupt",
+          `${sref(s)} condemns the unorthodox methods of ${ref(reformer)}; rebuked by a house that fears change, they leave to walk their own road.`,
+          "major", [reformer.id], [s.id]);
+        reformer.sect = null; s.members = s.members.filter(id => id !== reformer.id);
+        if (s.headId && s.headId !== reformer.id) addGrudge(reformer, s.headId, { event: ev.id });
+      } else {
+        s.reformLean += ri(8, 16);
+        if (s.align === "orthodox" && s.reformLean >= 30 && chance(.4)) {
+          s.align = "unorthodox";
+          chron("c-faction",
+            `Year by year, ${sref(s)} has sheltered those the canon would reject; the wider Murim now reckons it an unorthodox house in all but its own telling.`,
+            "major", [], [s.id]);
+        }
+      }
+    }
+  }
+}
+
+/* ---- imperial entanglement: an external claim on legitimacy ---- */
+
+export function sysPatronage() {
+  for (const s of aliveSects()) {
+    if (s.region !== IMPERIAL_REGION || s.patron || s.align === "demonic" || !s.alive) continue;
+    if (s.legitimacy >= 50 && chance(.05)) {
+      s.patron = true;
+      legit(s, ri(8, 15));
+      const r = regionByName(s.region); if (r) r.prosperity = clamp(r.prosperity + ri(4, 8), 0, 100);
+      chron("c-faction",
+        `${sref(s)} accepts the patronage of the Imperial Court — gold and recognition flow in, but the martial world murmurs that a sword should bow to no throne.`,
+        "major", [], [s.id]);
     }
   }
 }
@@ -913,12 +1125,15 @@ export function tick() {
   sysFame();
   if (yearTurn) {
     sysAging();
+    sysRegions();          // the mortal world breathes first; recruitment reads it
     sysSuccession();
     sysRecruitment();
     sysArtRefinement();
     sysRivalryAndWar();
     sysCorruptionAndThreat();
     sysFactions();
+    sysIdeology();
+    sysPatronage();
     sysLostAndFound();
     sysSectFortune();
     sysHeroicArcs();

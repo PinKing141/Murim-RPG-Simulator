@@ -25,6 +25,7 @@ export function makeBloc(type, align, name, kr) {
     founded: STATE.year, alive: true, dissolvedYear: null,
     formEvent: null, dissolveEvent: null, wonEvent: null,
     cohesion: 78,                 // internal stability; ≤0 → fracture / collapse
+    legitimacy: 60,               // the bloc's right to lead, inherited from its 맹주/교주
     rivalId: null,
     threatLed: false,             // a cult forged around a Heavenly Demon
     peakMembers: 0
@@ -83,6 +84,30 @@ export function strongestIn(sects) {
   for (const s of sects) {
     for (const f of s.members.map(figById).filter(x => x && x.alive)) {
       if (!best || f.power > best.f.power) best = { f, s };
+    }
+  }
+  return best;
+}
+
+/*
+  Who should *lead* — which is not the same as who hits hardest. A 맹주 or
+  교주 is chosen on a blend of martial weight, personal charisma, and the
+  legitimacy of the house behind them. The strongest fighter no longer wins
+  the political argument automatically; a charismatic heir of a renowned sect
+  can be raised over a stronger but obscure rival.
+*/
+export function leaderScore(f, s) {
+  return f.power
+    + (f.charisma || 0) * 6
+    + (s ? s.legitimacy : 0) * 4
+    + (f.namedAt != null ? 120 : 0);
+}
+export function bestLeaderIn(sects) {
+  let best = null, bestScore = -Infinity;
+  for (const s of sects) {
+    for (const f of s.members.map(figById).filter(x => x && x.alive)) {
+      const sc = leaderScore(f, s);
+      if (sc > bestScore) { bestScore = sc; best = { f, s }; }
     }
   }
   return best;

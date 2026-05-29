@@ -1,6 +1,6 @@
 import { cap, clamp } from './rng.js';
-import { ALIGN, REALMS, REALM_KR } from './data.js';
-import { STATE, figById } from './state.js';
+import { ALIGN, REALMS, REALM_KR, TERRAIN } from './data.js';
+import { STATE, figById, regionByName } from './state.js';
 import { bloodGrudges } from './bloodlines.js';
 import { stanceLabel } from './factions.js';
 
@@ -65,7 +65,7 @@ export function buildFigDossier(f) {
   h += `<div class="dos-meta">`;
   h += `Born Year ${f.born} · Age ${f.age}`;
   if (!f.alive && f.diedYear) h += ` · Died Year ${f.diedYear} · lived ${f.diedYear - f.born} yr`;
-  h += ` · Talent ${f.talent}`;
+  h += ` · Talent ${f.talent} · Charisma ${f.charisma}`;
   h += `</div>`;
 
   // causal "why?" traces for the figure's defining turns
@@ -199,6 +199,7 @@ export function buildBlocDossier(b) {
   h += `<div class="dos-meta">Forged Year ${b.founded}${!b.alive && b.dissolvedYear ? ` · Dissolved Year ${b.dissolvedYear}` : ''} · ${b.memberSects.length} member sects (peak ${b.peakMembers})</div>`;
   if (b.alive) {
     h += `<div class="dos-conn"><span class="dos-role">Cohesion</span>${Math.round(b.cohesion)} / 100${b.cohesion < 35 ? ' — the bonds are fraying' : ''}</div>`;
+    h += `<div class="dos-conn"><span class="dos-role">Legitimacy</span>${Math.round(b.legitimacy)} / 100${b.legitimacy < 35 ? ' — its right to lead is questioned' : ''}</div>`;
   }
   if (leader) {
     h += `<div class="dos-conn"><span class="dos-role">${title}</span>${flink(leader)}</div>`;
@@ -243,8 +244,15 @@ export function buildSectDossier(s) {
   h += `<span class="dos-badge" style="border-color:${al.c};color:${al.c}">${al.kr} ${al.label}</span>`;
   h += `<span class="dos-badge ${s.alive ? 'dos-alive' : 'dos-dead'}">${s.alive ? '● Active' : '✦ Dissolved'}</span>`;
   h += `</div>`;
-  h += `<div class="dos-meta">Founded Year ${s.founded}${!s.alive && s.deadYear ? ` · Dissolved Year ${s.deadYear}` : ''} · ${s.region}</div>`;
-  h += `<div class="dos-meta">Prestige ${Math.round(s.prestige)} · ${living.length} living disciples · ${s.allMembers.length} total</div>`;
+  const reg = regionByName(s.region);
+  h += `<div class="dos-meta">Founded Year ${s.founded}${!s.alive && s.deadYear ? ` · Dissolved Year ${s.deadYear}` : ''} · ${s.region}${reg ? ` · ${TERRAIN[reg.terrain].label}` : ''}</div>`;
+  h += `<div class="dos-meta">Prestige ${Math.round(s.prestige)} · Legitimacy ${Math.round(s.legitimacy)} · ${living.length} living disciples · ${s.allMembers.length} total</div>`;
+  if (reg) {
+    h += `<div class="dos-meta">Seat: ${TERRAIN[reg.terrain].label} — prosperity ${Math.round(reg.prosperity)}, stability ${Math.round(reg.stability)}, population ${Math.round(reg.population)}</div>`;
+  }
+  if (s.patron) h += `<div class="dos-conn"><span class="dos-role">Court</span>Patronised by the Imperial Throne</div>`;
+  if (s.doctrinalDebt >= 18) h += `<div class="dos-conn taint-mid"><span class="dos-role">Doctrine</span>Strained — forbidden methods harboured within (${Math.round(s.doctrinalDebt)})</div>`;
+  if (s.reformLean >= 15) h += `<div class="dos-conn"><span class="dos-role">Reform</span>Non-conformist currents stir within the house</div>`;
 
   /* the unorthodox middle: where this house leans, and what it remembers */
   if (s.align === "unorthodox") {

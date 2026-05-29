@@ -5,6 +5,7 @@ import { sectMight, topMember } from './systems.js';
 import { aliveBlocs, blocById, sectBloc, stanceLabel } from './factions.js';
 import { FOLLOW, buildFigDossier, buildSectDossier, buildBlocDossier } from './follow.js';
 import { loc } from './i18n.js';
+import { vitals } from './metrics.js';
 
 const $ = id => document.getElementById(id);
 export let autoScroll = true;
@@ -100,6 +101,20 @@ export function renderPanels() {
   $("s-war").textContent = STATE.activeWars.length;
   $("s-art").textContent = STATE.arts.filter(a => !a.lost && !a.dormant).length;
   $("s-lost").textContent = STATE.arts.filter(a => a.lost || a.dormant).length;
+
+  /* ---- vital signs: the shape of the age ---- */
+  const v = vitals();
+  const eb = $("erab");
+  eb.textContent = STATE.showHangul ? `${v.era.label} · ${v.era.kr}` : v.era.label;
+  eb.style.color = v.era.c;
+  eb.style.borderColor = v.era.c;
+  const vbar = (val, color) => `<div class="mini"><i style="width:${clamp(val,0,100)}%;background:${color}"></i></div>`;
+  $("vitals").innerHTML = `
+    <div class="vitals-title">Vital Signs of the Age</div>
+    <div class="vrow"><span>Polarisation</span>${vbar(v.polarisation*100, "var(--magyo)")}<b>${Math.round(v.polarisation*100)}</b></div>
+    <div class="vrow"><span>Legitimacy Gap</span>${vbar(v.legitimacySpread, "var(--sapa)")}<b>${Math.round(v.legitimacySpread)}</b></div>
+    <div class="vrow"><span>Authority</span>${vbar(v.legitimacy, "var(--gold)")}<b>${Math.round(v.legitimacy)}</b></div>
+    <div class="vrow"><span>Realm Health</span>${vbar(v.regionHealth, "var(--jeongpa)")}<b>${Math.round(v.regionHealth)}</b></div>`;
 
   /* ---- left: power blocs ---- */
   const bl = $("bloclist");
