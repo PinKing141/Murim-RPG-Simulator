@@ -3,6 +3,7 @@ import { genesis } from './genesis.js';
 import { renderLog, renderPanels, setAutoScroll } from './render.js';
 import { setFollow, clearFollow } from './follow.js';
 import { buildChainView } from './chain.js';
+import { buildTreeView } from './tree.js';
 
 const $ = id => document.getElementById(id);
 
@@ -12,6 +13,13 @@ function openChain(eid) {
   $("chain-overlay").style.display = 'flex';
 }
 function closeChain() { $("chain-overlay").style.display = 'none'; }
+
+/* ---- tree viewer ---- */
+function openTree(figId) {
+  $("tree-body").innerHTML = buildTreeView(+figId);
+  $("tree-overlay").style.display = 'flex';
+}
+function closeTree() { $("tree-overlay").style.display = 'none'; }
 
 let timer = null, speed = 420, paused = false;
 
@@ -77,10 +85,24 @@ $("figlist").addEventListener("click", e => {
 $("dossier-wrap").addEventListener("click", e => {
   const chainBtn = e.target.closest("[data-chain]");
   if (chainBtn) { openChain(chainBtn.dataset.chain); return; }
+  const treeBtn = e.target.closest("[data-open-tree]");
+  if (treeBtn) { openTree(treeBtn.dataset.openTree); return; }
   const ff = e.target.closest("[data-follow-fig]");
   if (ff) { setFollow('fig', +ff.dataset.followFig); renderLog(); renderPanels(); return; }
   const fs = e.target.closest("[data-follow-sect]");
   if (fs) { setFollow('sect', +fs.dataset.followSect); renderLog(); renderPanels(); }
+});
+
+/* ---- tree: navigate within the tree ---- */
+$("tree-body").addEventListener("click", e => {
+  const treeBtn = e.target.closest("[data-open-tree]");
+  if (treeBtn) { openTree(treeBtn.dataset.openTree); return; }
+  const ff = e.target.closest("[data-follow-fig]");
+  if (ff) { closeTree(); setFollow('fig', +ff.dataset.followFig); renderLog(); renderPanels(); }
+});
+$("tree-close").addEventListener("click", closeTree);
+$("tree-overlay").addEventListener("click", e => {
+  if (e.target === $("tree-overlay")) closeTree();
 });
 
 /* ---- chain: click an event in the chronicle ---- */
@@ -99,7 +121,7 @@ $("chain-overlay").addEventListener("click", e => {
   if (e.target === $("chain-overlay")) closeChain();
 });
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape") closeChain();
+  if (e.key === "Escape") { closeChain(); closeTree(); }
 });
 
 start((Math.random() * 0xffffffff) >>> 0);

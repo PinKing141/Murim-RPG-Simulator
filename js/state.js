@@ -9,13 +9,18 @@ export const STATE = {
   idc: 1, evc: 1, year: 1, season: 0,
   seasonNames: ["Spring","Summer","Autumn","Winter"],
   figures: [], sects: [], arts: [],
-  log: [], eventIndex: new Map(),
+  log: [], eventIndex: new Map(), figIndex: new Map(),
   dirtyLog: true, dirtyPanels: true,
   activeWars: [], threatActive: false, seed: 0
 };
 
 export function newId()    { return STATE.idc++; }
 export function newEvId()  { return STATE.evc++; }
+
+export function addToSect(s, f) {
+  s.members.push(f.id);
+  if (!s.allMembers.includes(f.id)) s.allMembers.push(f.id);
+}
 
 export function makeName() {
   if (chance(.22)) return pick(CLAN_SURNAMES) + " " + pick(GIVEN);
@@ -71,9 +76,12 @@ export function recomputePower(f) {
 export function makeFigure(opts = {}) {
   const align = opts.align || pick(["orthodox","orthodox","unorthodox","demonic","recluse"]);
   const talent = opts.talent != null ? opts.talent : ri(20, 80);
+  const name = opts.name || makeName();
+  const surname = name.split(" ")[0];
+  const clan = opts.clan || (CLAN_SURNAMES.includes(surname) ? surname : null);
   const f = {
     id: newId(), kind: "fig",
-    name: opts.name || makeName(),
+    name, surname, clan,
     byeolho: null,
     align, talent,
     realm: opts.realm != null ? opts.realm : 0,
@@ -90,11 +98,21 @@ export function makeFigure(opts = {}) {
     isThreat: false, namedAt: null,
     grudges: [], brothers: [],
     realmHistory: [], lineageId: null,
-    grudgeCause: {},
-    originEvent: null, fallEvent: null, ascendEvent: null
+    grudgeCause: {}, grudgeMeta: {},
+    originEvent: null, fallEvent: null, ascendEvent: null,
+    /* bloodline & bonds */
+    spouse: null,
+    parents: opts.parents || [],
+    children: [],
+    gen: opts.gen || 0,
+    bloodlineTaint: opts.bloodlineTaint || 0,
+    taintSource: opts.taintSource || null,
+    awakened: false,
+    killedBy: null
   };
   recomputeLife(f);
   recomputePower(f);
+  STATE.figIndex.set(f.id, f);
   return f;
 }
 
@@ -118,4 +136,4 @@ export function makeSect(opts = {}) {
 
 export const aliveFigs  = () => STATE.figures.filter(f => f.alive);
 export const aliveSects = () => STATE.sects.filter(s => s.alive);
-export const figById    = id => STATE.figures.find(f => f.id === id);
+export const figById    = id => STATE.figIndex.get(id);

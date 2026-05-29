@@ -165,6 +165,10 @@ button.ctl.primary:hover { box-shadow: 0 0 16px rgba(201,162,39,.25); }
 .c-duel   { --dot: var(--azure); }       .c-lost   { --dot: var(--eunja); }
 .c-found2 { --dot: var(--jade); }        .c-threat { --dot: #d14b3a; }
 .c-peace  { --dot: var(--jade); }        .c-lineage{ --dot: var(--sapa); }
+.c-bond        { --dot: #c97a5a; }
+.c-birth       { --dot: var(--jade); }
+.c-vengeance   { --dot: var(--blood); }
+.c-bloodline   { --dot: #9b59b6; }
 
 /* ---- Figures ---- */
 .figcard {
@@ -388,6 +392,10 @@ button.ctl.primary:hover { box-shadow: 0 0 16px rgba(201,162,39,.25); }
 .chain-row.c-duel   { --dot: var(--azure); }       .chain-row.c-lost   { --dot: var(--eunja); }
 .chain-row.c-found2 { --dot: var(--jade); }        .chain-row.c-threat { --dot: #d14b3a; }
 .chain-row.c-peace  { --dot: var(--jade); }        .chain-row.c-lineage{ --dot: var(--sapa); }
+.chain-row.c-bond      { --dot: #c97a5a; }
+.chain-row.c-birth     { --dot: var(--jade); }
+.chain-row.c-vengeance { --dot: var(--blood); }
+.chain-row.c-bloodline { --dot: #9b59b6; }
 
 .chain-empty { font-family: 'Cormorant Garamond', serif; font-style: italic; color: var(--ink-dim); text-align: center; padding: 16px; }
 
@@ -395,3 +403,77 @@ button.ctl.primary:hover { box-shadow: 0 0 16px rgba(201,162,39,.25); }
   .app { grid-template-columns: 1fr; }
   .panel.left, .panel.right { display: none; }
 }
+
+/* ---- Tree viewer ---- */
+.tree-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,.72); backdrop-filter: blur(3px);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 40px 20px; overflow-y: auto;
+}
+.tree-modal {
+  background: var(--paper-2); border: 1px solid var(--line);
+  border-radius: 4px; min-width: 560px; max-width: 90vw;
+  box-shadow: 0 8px 40px rgba(0,0,0,.7);
+}
+.tree-modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--line);
+}
+.tree-modal-title {
+  font-family: 'Cinzel', serif; font-size: 15px; letter-spacing: .08em; color: var(--gold-bright);
+}
+.tree-modal-title-kr { font-family: 'Noto Serif KR', serif; font-size: 13px; color: var(--ink-dim); margin-left: 8px; }
+.tree-modal-close {
+  background: none; border: none; color: var(--ink-dim); font-size: 22px;
+  cursor: pointer; padding: 0 4px; line-height: 1;
+}
+.tree-modal-close:hover { color: var(--ink); }
+.tree-modal-body { padding: 20px; overflow-x: auto; }
+
+.tree-header { margin-bottom: 16px; }
+.tree-title { font-family: 'Cinzel', serif; font-size: 14px; color: var(--gold); letter-spacing: .06em; }
+.tree-subtitle { font-size: 13px; color: var(--ink-dim); margin-top: 2px; }
+
+.tree-wrap { display: flex; flex-direction: column; }
+.tree-branch { display: flex; flex-direction: column; }
+.tree-children {
+  display: flex; flex-direction: column; gap: 4px;
+  margin-left: 28px; padding-left: 12px;
+  border-left: 1px solid var(--line);
+  margin-top: 4px;
+}
+
+.tree-node {
+  display: inline-flex; flex-direction: column; gap: 2px;
+  cursor: pointer; padding: 4px 8px; border-radius: 3px;
+  border-left: 2px solid var(--nc, var(--line));
+  transition: background .15s;
+}
+.tree-node:hover { background: rgba(255,255,255,.04); }
+.tree-root { border-color: var(--gold); }
+.tree-demon { border-color: var(--blood); }
+.tree-awakened .tree-name { color: #9b59b6; }
+.tree-dead { opacity: .55; }
+
+.tree-card { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tree-name { font-family: 'Cormorant Garamond', serif; font-size: 15px; color: var(--ink); font-weight: 500; }
+.tree-realm { font-family: 'Noto Serif KR', serif; font-size: 11px; color: var(--ink-dim); }
+.tree-art { font-family: 'Noto Serif KR', serif; font-size: 11px; color: var(--violet); }
+.tree-dates { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-faint); }
+.tree-taint { font-size: 11px; }
+.tree-taint-low { color: var(--sapa); }
+.tree-taint-mid { color: var(--blood); opacity: .8; }
+.tree-taint-high { color: #9b59b6; }
+.tree-spouse {
+  font-size: 12px; color: var(--ink-dim); cursor: pointer;
+  margin-left: 2px;
+}
+.tree-spouse:hover { color: var(--ink); }
+.tree-empty { color: var(--ink-dim); font-style: italic; padding: 16px; }
+
+/* ---- dossier family / taint ---- */
+.tree-btn { margin-top: 8px; }
+.taint-low  .dos-role { color: var(--sapa); }
+.taint-mid  .dos-role { color: var(--blood); }
+.taint-high .dos-role { color: #9b59b6; }

@@ -1,7 +1,11 @@
 import { rand, ri, pick, chance, clamp, cap } from './rng.js';
 import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN } from './data.js';
-import { STATE, aliveFigs, aliveSects, figById, makeFigure, makeSect, recomputeLife, recomputePower, makeByeolho } from './state.js';
+import { STATE, aliveFigs, aliveSects, figById, makeFigure, makeSect, addToSect, recomputeLife, recomputePower, makeByeolho } from './state.js';
 import { chron, ref, plainRef, sref, aref } from './chronicle.js';
+import {
+  addGrudge, decayGrudges, bloodGrudges, dropGrudge, inheritGrudgesOnDeath,
+  propagateTaintFrom, genDistance, makeChild
+} from './bloodlines.js';
 
 export function maybeName(f, force, causes = []) {
   if (f.namedAt != null) return null;
@@ -39,26 +43,29 @@ export function alignShift(f, amount, reason, causes = []) {
   }
 }
 
-export function killFigure(f, why, causes = []) {
-  f.alive = false; f.diedYear = STATE.year;
+export function killFigure(f, why, causes = [], killerId = null, opts = {}) {
+  f.alive = false; f.diedYear = STATE.year; f.killedBy = killerId;
   if (f.sect) { f.sect.members = f.sect.members.filter(id => id !== f.id); }
   if (f.art) f.art.holders = Math.max(0, f.art.holders - 1);
   let deathEv = null;
   if (f.namedAt != null || f.realm >= 4) {
-    const lvl = f.realm >= 6 ? "major" : "normal";
-    deathEv = chron("c-death",
-      `${ref(f)}${f.sect ? " of " + f.sect.name : ""} ${why}. ${f.realm >= 6 ? "An age ends with them." : ""}`,
-      lvl, [f.id], [], causes);
+    const lvl = opts.level || (f.realm >= 6 ? "major" : "normal");
+    const html = opts.html ||
+      `${ref(f)}${f.sect ? " of " + f.sect.name : ""} ${why}. ${f.realm >= 6 ? "An age ends with them." : ""}`;
+    deathEv = chron(opts.cls || "c-death", html, lvl, [f.id], [], causes);
     if (f.isThreat) {
       STATE.threatActive = false;
+      propagateTaintFrom(f);
       const peace = chron("c-peace",
-        `With the fall of the Heavenly Demon, the Murim exhales. Yet ${aref(f.art)} was never recovered...`,
+        `With the fall of the Heavenly Demon, the Murim exhales. Yet ${aref(f.art)} was never recovered — and the taint lingers in the blood of their line.`,
         "major", [f.id], [], [deathEv.id]);
       if (f.art) {
         f.art.dormant = true; f.art.lostHolder = f.name; f.art.lostHolderId = f.id;
         f.art.lostEvent = peace.id;
       }
     }
+    /* the slain pass their unsettled debts — and a new one against their killer — to their heirs */
+    inheritGrudgesOnDeath(f, killerId, deathEv.id);
   }
   return deathEv;
 }
@@ -110,10 +117,11 @@ function grudgeCauseBetween(A, B) {
 
 function battle(A, B, pa, pb, w) {
   const winner = pa >= pb ? A : B, loser = pa >= pb ? B : A;
+  const slayer = topMember(winner);
   const victims = loser.members.map(figById).filter(x => x && x.alive);
   if (victims.length > 1 && chance(.6)) {
     const v = pick(victims.sort((x, y) => x.power - y.power).slice(0, Math.ceil(victims.length / 2)));
-    if (v) killFigure(v, `falls in battle during ${w.name} (${w.kr})`, w.startEvent != null ? [w.startEvent] : []);
+    if (v) killFigure(v, `falls in battle during ${w.name} (${w.kr})`, w.startEvent != null ? [w.startEvent] : [], slayer ? slayer.id : null);
   }
   const cA = topMember(winner), cB = topMember(loser);
   if (cA && cB && chance(.25)) {
@@ -182,11 +190,6 @@ export function sysAging() {
     if (f.align === "demonic") deathP += 0.01;
     if (chance(deathP)) killFigure(f, "passes from the world, their naegong returning to heaven and earth");
   }
-}
-
-function addToSect(s, f) {
-  s.members.push(f.id);
-  if (!s.allMembers.includes(f.id)) s.allMembers.push(f.id);
 }
 
 export function sysRecruitment() {
@@ -282,6 +285,9 @@ export function sysCorruptionAndThreat() {
     }
     if (!STATE.threatActive && f.align === "demonic" && f.realm >= 7 && f.alignmentDrift >= 85 && chance(.4)) {
       f.isThreat = true; STATE.threatActive = true;
+      /* the demon becomes the wellspring of a taint that will run in their blood */
+      if (f.taintSource == null) { f.bloodlineTaint = 100; f.taintSource = f.id; }
+      propagateTaintFrom(f);
       maybeName(f);
       const ev = chron("c-threat",
         `A shadow falls over all under heaven: ${ref(f)} ascends as the <b style="color:var(--blood)">Heavenly Demon (천마)</b> and declares the old order finished. ${f.lineage ? `Heir to ${f.lineage}, ` : ""}the Murim trembles.`,
@@ -297,13 +303,13 @@ export function sysCorruptionAndThreat() {
         const champ = heroes.sort((a, b) => b.power - a.power)[0];
         const threatCause = threat.ascendEvent != null ? [threat.ascendEvent] : [];
         if (champ.power > threat.power * 0.85 && chance(.5)) {
-          const death = killFigure(threat, `is at last cut down by ${champ.byeolho ? cap(champ.byeolho.en) : champ.name} and the orthodox alliance (무림맹)`, threatCause);
+          const death = killFigure(threat, `is at last cut down by ${champ.byeolho ? cap(champ.byeolho.en) : champ.name} and the orthodox alliance (무림맹)`, threatCause, champ.id);
           champ.fame += 20; maybeName(champ);
           chron("c-rise",
             `${ref(champ)} is hailed across the Murim as the hero who slew the Heavenly Demon.`,
             "major", [champ.id], [], death ? [death.id] : []);
         } else {
-          killFigure(champ, `is slain confronting the Heavenly Demon`, threatCause);
+          killFigure(champ, `is slain confronting the Heavenly Demon`, threatCause, threat.id);
         }
       }
     }
@@ -383,11 +389,116 @@ export function sysHeroicArcs() {
         const ev = chron(arc.cls, html, "normal", [a.id, b.id]);
         /* wire relationships, recording the event that birthed each grudge so wars can trace back to it */
         if (arc.kind === "brother") { a.brothers.push(b.id); b.brothers.push(a.id); }
-        else if (arc.kind === "betray")  { a.grudges.push(b.id); a.grudgeCause[b.id] = ev.id; }
-        else if (arc.kind === "duel")    { b.grudges.push(a.id); b.grudgeCause[a.id] = ev.id; }
+        else if (arc.kind === "betray")  { addGrudge(a, b.id, { event: ev.id }); }
+        else if (arc.kind === "duel")    { addGrudge(b, a.id, { event: ev.id }); }
       }
     }
   }
+}
+
+/* ---- bloodlines & bonds ---- */
+
+const ALIGN_OK = (x, y) => !((x === "orthodox" && y === "demonic") || (x === "demonic" && y === "orthodox"));
+const shareParent = (a, b) => a.parents.some(p => b.parents.includes(p));
+
+export function sysBonds() {
+  const eligible = aliveFigs().filter(f => f.spouse == null && f.align !== "recluse" && f.age >= 18 && f.age <= 55 && f.realm >= 1);
+  if (eligible.length < 2) return;
+  for (let i = 0; i < ri(1, 2); i++) {
+    if (!chance(.5)) continue;
+    const a = pick(eligible);
+    if (a.spouse != null) continue;
+    const cand = eligible.filter(b =>
+      b !== a && b.spouse == null &&
+      Math.abs(b.age - a.age) <= 18 &&
+      !a.parents.includes(b.id) && !b.parents.includes(a.id) &&
+      !shareParent(a, b) &&
+      ALIGN_OK(a.align, b.align));
+    if (!cand.length) continue;
+    /* a match within a clan, or that marries into one, is favoured — dynasties seek dynasties */
+    const clanPref = cand.filter(b => (a.clan && b.clan) || b.clan);
+    const b = pick(clanPref.length && chance(.6) ? clanPref : cand);
+    a.spouse = b.id; b.spouse = a.id;
+    if (a.namedAt != null || b.namedAt != null || a.clan || b.clan) {
+      const line = (a.clan || b.clan) ? ` — a union binding the ${a.clan || b.clan} (${(a.clan||b.clan)}세가) line` : "";
+      chron("c-bond", `${ref(a)} and ${ref(b)} are wed${line}.`, "normal", [a.id, b.id]);
+    }
+  }
+}
+
+export function sysProcreation() {
+  for (const f of aliveFigs()) {
+    if (f.spouse == null || f.id > f.spouse) continue;     // one pass per couple
+    const sp = figById(f.spouse);
+    if (!sp || !sp.alive) continue;
+    if (f.age < 18 || f.age > 50 || sp.age < 18 || sp.age > 50) continue;
+    const shared = f.children.filter(cid => sp.children.includes(cid)).length;
+    if (shared >= 3 || !chance(.22)) continue;
+    const child = makeChild(f, sp);
+    if (child.clan || child.talent >= 82) {
+      const note = child.clan ? `, born into the ${child.clan} (${child.clan}세가) line` :
+        child.talent >= 90 ? `, said to carry a once-in-an-age root` : `, a child of rare promise`;
+      chron("c-birth", `${plainRef(child)} is born to ${ref(f)} and ${ref(sp)}${note}.`, "normal", [child.id, f.id, sp.id]);
+    }
+  }
+}
+
+export function sysVengeance() {
+  for (const f of aliveFigs()) {
+    if (f.realm < 4) continue;
+    const targets = bloodGrudges(f).map(figById).filter(t => t && t.alive);
+    if (!targets.length || !chance(.12)) continue;
+    const t = pick(targets);
+    if (f.power >= t.power * 0.8 && chance(.6)) {
+      const meta = f.grudgeMeta[t.id];
+      const cause = meta && meta.event != null ? [meta.event] : [];
+      const kin = (f.parents.includes(t.killedBy) || (figById(t.id) && false)) ? "" : "";
+      const html = `${ref(f)} hunts down ${ref(t)} at last — a blood debt, sworn ${STATE.year - (meta ? meta.born : STATE.year)} years past, paid in full in steel.`;
+      killFigure(t, "", cause, f.id, { cls: "c-vengeance", html, level: "major" });
+      dropGrudge(f, t.id);
+      f.fame += 8;
+    }
+  }
+}
+
+function genWord(d) {
+  return ["", "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth"][d] || (d + "th");
+}
+
+export function sysBloodlineAwakening() {
+  for (const f of aliveFigs()) {
+    if (f.awakened || f.taintSource == null || f.bloodlineTaint < 35 || f.realm < 4) continue;
+    const ancestor = figById(f.taintSource);
+    if (!ancestor || ancestor.alive) continue;
+    if (ancestor.diedYear == null || ancestor.diedYear > f.born) continue;  // they could have known them — not the arc
+    const dist = genDistance(f, ancestor.id);
+    if (dist < 3) continue;                                                 // great-grandchild or deeper
+    if (!chance(0.05 + f.bloodlineTaint / 700)) continue;
+
+    f.awakened = true;
+    f.align = "demonic";
+    f.alignmentDrift = clamp(Math.max(f.alignmentDrift, 82), 0, 100);
+    let artNote = "";
+    if (ancestor.art) {
+      const art = ancestor.art;
+      if (art.lost || art.dormant) { art.lost = false; art.dormant = false; }
+      art.holders++;
+      f.art = art;
+      f.lineage = (ancestor.byeolho ? cap(ancestor.byeolho.en) : ancestor.name) + "'s blood";
+      f.lineageId = ancestor.id;
+      artNote = ` The ${art.name} (${art.kr}) wakes in their meridians as though it never slept.`;
+    }
+    recomputeLife(f); recomputePower(f);
+    const aName = ancestor.byeolho ? `${cap(ancestor.byeolho.en)} (${ancestor.byeolho.kr})` : ancestor.name;
+    const ev = chron("c-bloodline",
+      `The blood remembers: ${ref(f)} — ${genWord(dist)}-generation descendant of the Heavenly Demon ${aName}, dead ${STATE.year - ancestor.diedYear} years before they were ever born — awakens the taint sleeping in their veins.${artNote}`,
+      "epic", [f.id], [], ancestor.ascendEvent != null ? [ancestor.ascendEvent] : (ancestor.fallEvent != null ? [ancestor.fallEvent] : []));
+    f.fallEvent = ev.id;
+  }
+}
+
+export function sysGrudgeDecay() {
+  for (const f of aliveFigs()) decayGrudges(f);
 }
 
 export function tick() {
@@ -406,6 +517,11 @@ export function tick() {
     sysLostAndFound();
     sysSectFortune();
     sysHeroicArcs();
+    sysBonds();
+    sysProcreation();
+    sysVengeance();
+    sysBloodlineAwakening();
+    sysGrudgeDecay();
   }
   STATE.dirtyPanels = true;
 }

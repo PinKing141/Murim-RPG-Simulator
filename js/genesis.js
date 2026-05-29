@@ -1,12 +1,7 @@
 import { RNG, makeRNG, ri, pick, chance } from './rng.js';
-import { STATE, makeArt, makeSect, makeFigure, aliveSects } from './state.js';
+import { STATE, makeArt, makeSect, makeFigure, addToSect, aliveSects } from './state.js';
 import { chron, ref, sref, aref } from './chronicle.js';
 import { maybeName } from './systems.js';
-
-function addToSect(s, f) {
-  s.members.push(f.id);
-  if (!s.allMembers.includes(f.id)) s.allMembers.push(f.id);
-}
 
 export function genesis(seed) {
   RNG.fn = makeRNG(seed >>> 0);
@@ -14,7 +9,7 @@ export function genesis(seed) {
     idc: 1, evc: 1, year: 1, season: 0,
     seasonNames: ["Spring","Summer","Autumn","Winter"],
     figures: [], sects: [], arts: [],
-    log: [], eventIndex: new Map(),
+    log: [], eventIndex: new Map(), figIndex: new Map(),
     dirtyLog: true, dirtyPanels: true,
     activeWars: [], threatActive: false, seed
   });

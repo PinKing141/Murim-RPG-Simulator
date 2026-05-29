@@ -1,6 +1,7 @@
 import { cap } from './rng.js';
 import { ALIGN, REALMS, REALM_KR } from './data.js';
 import { STATE, figById } from './state.js';
+import { bloodGrudges } from './bloodlines.js';
 
 export const FOLLOW = { kind: null, id: null };
 
@@ -40,6 +41,10 @@ export function buildFigDossier(f) {
   const disciples = STATE.figures.filter(x => x.master === f.id);
   const brothers = (f.brothers || []).map(figById).filter(Boolean);
   const grudges  = (f.grudges  || []).map(figById).filter(Boolean);
+  const spouse   = f.spouse ? figById(f.spouse) : null;
+  const parents  = (f.parents || []).map(figById).filter(Boolean);
+  const children = (f.children || []).map(figById).filter(Boolean);
+  const bloodGrudgeIds = bloodGrudges(f);
 
   const flink = (fig) => {
     const n = fig.byeolho && fig.namedAt != null ? cap(fig.byeolho.en) : fig.name;
@@ -117,6 +122,48 @@ export function buildFigDossier(f) {
         : f.lineage;
       h += `<div class="dos-conn"><span class="dos-role">Lineage</span>${inner}</div>`;
     }
+  }
+
+  // family
+  const hasFam = spouse || parents.length || children.length;
+  if (hasFam) {
+    h += `<div class="dos-sec">Family</div>`;
+    if (parents.length) {
+      h += `<div class="dos-conn"><span class="dos-role">Parents</span>${parents.map(flink).join(' · ')}</div>`;
+    }
+    if (spouse) {
+      h += `<div class="dos-conn"><span class="dos-role">Spouse</span>${flink(spouse)}</div>`;
+    }
+    if (children.length) {
+      const taintChild = (c) => {
+        const t = c.bloodlineTaint >= 80 ? ' ☯' : c.bloodlineTaint >= 40 ? ' ·' : '';
+        const n = c.byeolho && c.namedAt != null ? cap(c.byeolho.en) : c.name;
+        return `<span class="dos-link" data-follow-fig="${c.id}">${n}${t}</span>`;
+      };
+      h += `<div class="dos-conn"><span class="dos-role">Children</span>${children.slice(0, 6).map(taintChild).join(', ')}${children.length > 6 ? ` +${children.length - 6}` : ''}</div>`;
+    }
+    if (f.bloodlineTaint >= 30) {
+      const lvl = f.bloodlineTaint >= 80 ? 'high' : f.bloodlineTaint >= 50 ? 'mid' : 'low';
+      h += `<div class="dos-conn taint-${lvl}"><span class="dos-role">Taint</span>Bloodline taint ${f.bloodlineTaint} — the old power stirs within the blood</div>`;
+    }
+    if (f.awakened) {
+      h += `<div class="dos-conn taint-high"><span class="dos-role">Awakened</span>The dormant power of the Heavenly Demon has erupted</div>`;
+    }
+  }
+
+  // bloodline tree button
+  if (parents.length || children.length || f.children?.length) {
+    h += `<button class="why-btn tree-btn" data-open-tree="${f.id}">🌳 View Bloodline Tree</button>`;
+  }
+
+  // blood grudges callout
+  if (bloodGrudgeIds.length) {
+    const targets = bloodGrudgeIds.map(tid => {
+      const t = figById(tid);
+      return t ? flink(t) : '(unknown)';
+    });
+    h += `<div class="dos-sec">Blood Debt</div>`;
+    h += `<div class="dos-conn taint-high"><span class="dos-role">Vendetta</span>${targets.join(', ')}</div>`;
   }
 
   // obituary for dead figures
