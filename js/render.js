@@ -2,7 +2,8 @@ import { clamp, cap } from './rng.js';
 import { ALIGN, REALMS, REALM_KR } from './data.js';
 import { STATE, aliveFigs, aliveSects, figById } from './state.js';
 import { sectMight, topMember } from './systems.js';
-import { FOLLOW, buildFigDossier, buildSectDossier } from './follow.js';
+import { aliveBlocs, blocById, sectBloc } from './factions.js';
+import { FOLLOW, buildFigDossier, buildSectDossier, buildBlocDossier } from './follow.js';
 
 const $ = id => document.getElementById(id);
 export let autoScroll = true;
@@ -46,6 +47,17 @@ export function renderLog() {
       );
       setBanner(`<span class="fb-label">Following</span> <span class="fb-name">${s.name} (${s.kr})</span><span class="fb-dim"> · ${entries.length} entries</span>`);
     } else { entries = STATE.log.slice(-260); banner.style.display = 'none'; }
+  } else if (FOLLOW.kind === 'bloc') {
+    const b = blocById(FOLLOW.id);
+    if (b) {
+      const memberSet = new Set(b.memberSects);
+      entries = STATE.log.filter(e =>
+        (e.sects && e.sects.some(id => memberSet.has(id))) ||
+        (b.leaderId != null && e.figs && e.figs.includes(b.leaderId)) ||
+        e.id === b.formEvent || e.id === b.dissolveEvent || e.id === b.wonEvent
+      );
+      setBanner(`<span class="fb-label">Following</span> <span class="fb-name">${b.name} (${b.kr})</span><span class="fb-dim"> · ${entries.length} entries</span>`);
+    } else { entries = STATE.log.slice(-260); banner.style.display = 'none'; }
   } else {
     entries = STATE.log.slice(-260);
     banner.style.display = 'none';
@@ -88,6 +100,31 @@ export function renderPanels() {
   $("s-art").textContent = STATE.arts.filter(a => !a.lost && !a.dormant).length;
   $("s-lost").textContent = STATE.arts.filter(a => a.lost || a.dormant).length;
 
+  /* ---- left: power blocs ---- */
+  const bl = $("bloclist");
+  const blocs = aliveBlocs();
+  bl.innerHTML = "";
+  if (blocs.length) {
+    bl.innerHTML = `<div class="panel-title">Powers of the Age</div>`;
+    for (const b of blocs) {
+      const al = ALIGN[b.align];
+      const leader = b.leaderId != null ? figById(b.leaderId) : null;
+      const ln = leader ? (leader.byeolho && leader.namedAt != null ? cap(leader.byeolho.en) : leader.name) : "—";
+      const title = b.type === "alliance" ? "맹주" : "교주";
+      const isF = FOLLOW.kind === "bloc" && FOLLOW.id === b.id;
+      const card = document.createElement("div");
+      card.className = "bloc-card" + (isF ? " followed" : "");
+      card.dataset.id = b.id;
+      card.style.setProperty("--c", al.c);
+      card.innerHTML = `
+        <div class="bloc-name">${b.kr}<span class="en">${b.name.replace(/^the /, "")}</span></div>
+        <div class="bloc-meta"><span>${title}: <b>${ln}</b></span><span>${b.memberSects.length} sects</span></div>
+        <div class="bloc-coh"><span>결속</span><div class="mini"><i style="width:${clamp(b.cohesion,0,100)}%;background:${al.c}"></i></div></div>
+      `;
+      bl.appendChild(card);
+    }
+  }
+
   /* ---- left: sects ---- */
   const sl = $("sectlist");
   const sects = [...STATE.sects].sort((a,b) => (b.alive - a.alive) || (sectMight(b) - sectMight(a)));
@@ -103,6 +140,7 @@ export function renderPanels() {
     div.dataset.id = s.id;
     div.style.setProperty("--c", al.c);
     const leadName = lead ? (lead.byeolho && lead.namedAt != null ? cap(lead.byeolho.en) : lead.name) : "";
+    const sb = s.alive ? sectBloc(s.id) : null;
     div.innerHTML = `
       <div class="sect-head">
         <div class="sect-name">${s.kr}<span class="en">${s.name}</span></div>
@@ -113,6 +151,7 @@ export function renderPanels() {
         <span>${s.region.replace("the ","").replace(/\s*\(.*\)/,"")}</span>
       </div>
       ${lead ? `<div class="sect-meta"><span>Head: <b>${leadName}</b> · ${REALM_KR[lead.realm]}</span></div>` : ""}
+      ${sb ? `<div class="sect-bloc" style="--bc:${ALIGN[sb.align].c}">${sb.type === "alliance" ? "盟" : "敎"} ${sb.kr}</div>` : ""}
       <div class="pbar"><i style="width:${clamp(s.prestige,0,100)}%"></i></div>
     `;
     sl.appendChild(div);
@@ -132,6 +171,11 @@ export function renderPanels() {
     figPanel.style.display = 'none';
     dossierWrap.style.display = 'block';
     dossierWrap.innerHTML = s ? buildSectDossier(s) : '<div class="dos-empty">Sect not found.</div>';
+  } else if (FOLLOW.kind === 'bloc') {
+    const b = blocById(FOLLOW.id);
+    figPanel.style.display = 'none';
+    dossierWrap.style.display = 'block';
+    dossierWrap.innerHTML = b ? buildBlocDossier(b) : '<div class="dos-empty">Bloc not found.</div>';
   } else {
     figPanel.style.display = '';
     dossierWrap.style.display = 'none';

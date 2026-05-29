@@ -8,10 +8,11 @@ import {
 export const STATE = {
   idc: 1, evc: 1, year: 1, season: 0,
   seasonNames: ["Spring","Summer","Autumn","Winter"],
-  figures: [], sects: [], arts: [],
+  figures: [], sects: [], arts: [], blocs: [],
   log: [], eventIndex: new Map(), figIndex: new Map(),
   dirtyLog: true, dirtyPanels: true,
-  activeWars: [], threatActive: false, seed: 0
+  activeWars: [], threatActive: false, lastThreatFall: null,
+  cultCooldownUntil: 0, threatCooldownUntil: 0, seed: 0
 };
 
 export function newId()    { return STATE.idc++; }
@@ -128,6 +129,7 @@ export function makeSect(opts = {}) {
     prestige: opts.prestige != null ? opts.prestige : ri(25, 55),
     members: [], allMembers: [],
     signatureArt: null,
+    headId: null,
     alive: true, deadYear: null,
     fallEvent: null,
     atWarWith: []

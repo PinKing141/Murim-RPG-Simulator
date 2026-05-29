@@ -8,10 +8,11 @@ export function genesis(seed) {
   Object.assign(STATE, {
     idc: 1, evc: 1, year: 1, season: 0,
     seasonNames: ["Spring","Summer","Autumn","Winter"],
-    figures: [], sects: [], arts: [],
+    figures: [], sects: [], arts: [], blocs: [],
     log: [], eventIndex: new Map(), figIndex: new Map(),
     dirtyLog: true, dirtyPanels: true,
-    activeWars: [], threatActive: false, seed
+    activeWars: [], threatActive: false, lastThreatFall: null,
+    cultCooldownUntil: 0, threatCooldownUntil: 0, seed
   });
 
   const nArt = ri(5, 7);

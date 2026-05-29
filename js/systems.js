@@ -1,11 +1,15 @@
 import { rand, ri, pick, chance, clamp, cap } from './rng.js';
 import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN } from './data.js';
 import { STATE, aliveFigs, aliveSects, figById, makeFigure, makeSect, addToSect, recomputeLife, recomputePower, makeByeolho } from './state.js';
-import { chron, ref, plainRef, sref, aref } from './chronicle.js';
+import { chron, ref, plainRef, sref, aref, bref } from './chronicle.js';
 import {
   addGrudge, decayGrudges, bloodGrudges, dropGrudge, inheritGrudgesOnDeath,
   propagateTaintFrom, genDistance, makeChild
 } from './bloodlines.js';
+import {
+  makeBloc, aliveBlocs, allianceBloc, cultBloc, sectBloc,
+  blocLeader, blocSects, strongestIn
+} from './factions.js';
 
 export function maybeName(f, force, causes = []) {
   if (f.namedAt != null) return null;
@@ -55,6 +59,9 @@ export function killFigure(f, why, causes = [], killerId = null, opts = {}) {
     deathEv = chron(opts.cls || "c-death", html, lvl, [f.id], [], causes);
     if (f.isThreat) {
       STATE.threatActive = false;
+      STATE.lastThreatFall = deathEv.id;
+      /* a Heavenly Demon is a generational calamity — the next is decades away */
+      STATE.threatCooldownUntil = STATE.year + ri(25, 50);
       propagateTaintFrom(f);
       const peace = chron("c-peace",
         `With the fall of the Heavenly Demon, the Murim exhales. Yet ${aref(f.art)} was never recovered — and the taint lingers in the blood of their line.`,
@@ -283,7 +290,7 @@ export function sysCorruptionAndThreat() {
       if (STATE.activeWars.length) drift += rand() * 0.6;
       if (drift > 0) alignShift(f, drift, null, causes);
     }
-    if (!STATE.threatActive && f.align === "demonic" && f.realm >= 7 && f.alignmentDrift >= 85 && chance(.4)) {
+    if (!STATE.threatActive && STATE.year >= STATE.threatCooldownUntil && f.align === "demonic" && f.realm >= 7 && f.alignmentDrift >= 85 && chance(.4)) {
       f.isThreat = true; STATE.threatActive = true;
       /* the demon becomes the wellspring of a taint that will run in their blood */
       if (f.taintSource == null) { f.bloodlineTaint = 100; f.taintSource = f.id; }
@@ -419,8 +426,15 @@ export function sysBonds() {
     const clanPref = cand.filter(b => (a.clan && b.clan) || b.clan);
     const b = pick(clanPref.length && chance(.6) ? clanPref : cand);
     a.spouse = b.id; b.spouse = a.id;
-    if (a.namedAt != null || b.namedAt != null || a.clan || b.clan) {
-      const line = (a.clan || b.clan) ? ` — a union binding the ${a.clan || b.clan} (${(a.clan||b.clan)}세가) line` : "";
+    /* a marriage between two houses of the same bloc cements the alliance */
+    const ba = a.sect ? sectBloc(a.sect.id) : null;
+    const bb = b.sect ? sectBloc(b.sect.id) : null;
+    const stateMatch = ba && bb && ba.id === bb.id && a.sect.id !== b.sect.id;
+    if (stateMatch) ba.cohesion = clamp(ba.cohesion + ri(3, 8), 0, 100);
+    if (a.namedAt != null || b.namedAt != null || a.clan || b.clan || stateMatch) {
+      const line = stateMatch
+        ? ` — a marriage of state (정략혼) knitting two houses of ${bref(ba)} closer`
+        : (a.clan || b.clan) ? ` — a union binding the ${a.clan || b.clan} (${(a.clan||b.clan)}세가) line` : "";
       chron("c-bond", `${ref(a)} and ${ref(b)} are wed${line}.`, "normal", [a.id, b.id]);
     }
   }
@@ -497,6 +511,274 @@ export function sysBloodlineAwakening() {
   }
 }
 
+/* ---- factions as institutions ---- */
+
+function dissolveBloc(b, why, causes = []) {
+  if (!b.alive) return null;
+  b.alive = false; b.dissolvedYear = STATE.year;
+  /* a fallen cult leaves a vacuum that takes a generation to refill —
+     this is also what gives the alliance an enemy-free window to fracture */
+  if (b.type === "cult") STATE.cultCooldownUntil = STATE.year + ri(18, 35);
+  const ev = chron("c-schism",
+    `${bref(b)} ${why}.`,
+    "major", b.leaderId != null ? [b.leaderId] : [], b.memberSects, causes);
+  b.dissolveEvent = ev.id;
+  return ev;
+}
+
+/* a bloc whose 맹주/교주 has fallen raises a successor — for the cult,
+   in blood. Feeds the causal chain: a leader's death → a succession crisis. */
+function ensureBlocLeader(b) {
+  const leader = blocLeader(b);
+  if (leader && leader.alive) return;
+  const sects = blocSects(b);
+  const best = strongestIn(sects);
+  if (!best) return;
+  const prevRef = leader ? ref(leader) : "the empty throne";
+  const cause = leader && leader.fallEvent != null ? [leader.fallEvent] : [];
+  b.leaderId = best.f.id; b.leaderSectId = best.s.id;
+
+  if (b.type === "cult") {
+    b.threatLed = !!best.f.isThreat;
+    b.cohesion = clamp(b.cohesion - ri(12, 26), 0, 100);
+    const ev = chron("c-faction",
+      `The throne of ${bref(b)} falls vacant${leader ? ` with ${prevRef} slain` : ""}; ${ref(best.f)} seizes the title of 교주 in the succession struggle that follows.`,
+      "major", [best.f.id], b.memberSects, cause);
+    const rival = sects.flatMap(s => s.members.map(figById))
+      .filter(x => x && x.alive && x.id !== best.f.id && x.realm >= 5)
+      .sort((a, c) => c.power - a.power)[0];
+    if (rival && chance(.6)) {
+      killFigure(rival, "", [ev.id], best.f.id, {
+        cls: "c-schism",
+        html: `${ref(rival)}, who contested the throne of ${bref(b)}, is purged by the new 교주 ${ref(best.f)}.`,
+        level: "major"
+      });
+    }
+  } else {
+    chron("c-faction",
+      `With ${prevRef} fallen, the sects of ${bref(b)} raise ${ref(best.f)} of ${sref(best.s)} as the new 맹주.`,
+      "major", [best.f.id], b.memberSects, cause);
+  }
+  best.f.fame += 8; maybeName(best.f);
+}
+
+/* the orthodox alliance, having no enemy left to bind it, dissolves into
+   the old rivalries — the pendulum swings back from unity to infighting */
+function fractureAlliance(b) {
+  if (!b.alive) return;
+  b.alive = false; b.dissolvedYear = STATE.year;
+  const sects = blocSects(b);
+  const cause = [];
+  if (b.wonEvent != null) cause.push(b.wonEvent);
+  else if (b.formEvent != null) cause.push(b.formEvent);
+  const ev = chron("c-schism",
+    `With no common enemy left to bind them, ${bref(b)} fractures from within — old rivalries and naked ambition resurface, and the great oath dissolves into mutual suspicion.`,
+    "epic", b.leaderId != null ? [b.leaderId] : [], b.memberSects, cause);
+  b.dissolveEvent = ev.id;
+  const ranked = sects.map(s => ({ s, m: sectMight(s) })).sort((a, c) => c.m - a.m).map(x => x.s);
+  if (ranked.length >= 2 && !warExists(ranked[0], ranked[1])) {
+    const a = ranked[0], b2 = ranked[1];
+    const wn = pick(WAR_NAMES);
+    const w = { a: a.id, b: b2.id, name: wn[0], kr: wn[1], years: 0, start: STATE.year, startEvent: null };
+    STATE.activeWars.push(w);
+    a.atWarWith.push(b2.id); b2.atWarWith.push(a.id);
+    const wev = chron("c-war",
+      `The first blood of the new disorder: ${sref(a)} and ${sref(b2)}, once sworn brothers of ${bref(b)}, fall into open war — ${w.name} (${w.kr}) — over who should have led.`,
+      "major", [], [a.id, b2.id], [ev.id]);
+    w.startEvent = wev.id;
+  }
+}
+
+export function sysFactions() {
+  const threat = aliveFigs().find(f => f.isThreat) || null;
+  const threatActive = STATE.threatActive && !!threat;
+  const hadCult = cultBloc();
+
+  /* the demonic houses unite under a 교주 — always around a Heavenly Demon,
+     and otherwise only when the demonic sects grow truly dominant. A cooldown
+     after a cult falls keeps the throne empty for a generation. */
+  if (!cultBloc() && (threat || STATE.year >= STATE.cultCooldownUntil)) {
+    const demonic = aliveSects().filter(s => s.align === "demonic");
+    const canUnion = demonic.length >= 3 && chance(.15);
+    if (threat || canUnion) {
+      const led = threat || (strongestIn(demonic) || {}).f;
+      if (led) {
+        const b = makeBloc("cult", "demonic",
+          threat ? "the Heavenly Demon Cult" : "the Demonic Union",
+          threat ? "천마신교" : "마교연합");
+        b.memberSects = demonic.map(s => s.id);
+        b.leaderId = led.id; b.leaderSectId = led.sect ? led.sect.id : null;
+        b.threatLed = !!threat;
+        STATE.blocs.push(b);
+        const cause = threat && threat.ascendEvent != null ? [threat.ascendEvent] : [];
+        const ev = chron("c-faction",
+          `${threat ? `Under the Heavenly Demon ${ref(led)}` : `Led by ${ref(led)}`}, the demonic houses unite as ${bref(b)}. A single 교주 commands the Demonic Path, and all under heaven feel the cold.`,
+          threat ? "epic" : "major", [led.id], b.memberSects, cause);
+        b.formEvent = ev.id;
+      }
+    }
+  }
+
+  /* the orthodox sects swear the oath of the Murim Alliance against the demonic tide */
+  if (!allianceBloc() && (cultBloc() || threatActive)) {
+    const orthodox = aliveSects().filter(s => s.align === "orthodox");
+    const best = strongestIn(orthodox);
+    if (orthodox.length >= 2 && best) {
+      const b = makeBloc("alliance", "orthodox", "the Murim Alliance", "무림맹");
+      b.memberSects = orthodox.map(s => s.id);
+      for (const s of aliveSects().filter(x => x.align === "unorthodox")) if (chance(.45)) b.memberSects.push(s.id);
+      b.leaderId = best.f.id; b.leaderSectId = best.s.id;
+      const cult = cultBloc();
+      if (cult) { b.rivalId = cult.id; cult.rivalId = b.id; }
+      STATE.blocs.push(b);
+      best.f.fame += 14; maybeName(best.f, true);
+      const cause = [];
+      if (cult && cult.formEvent != null) cause.push(cult.formEvent);
+      else if (threat && threat.ascendEvent != null) cause.push(threat.ascendEvent);
+      const ev = chron("c-faction",
+        `The righteous houses set aside old feuds: ${b.memberSects.length} sects swear the oath of ${bref(b)}, raising ${ref(best.f)} of ${sref(best.s)} as 맹주 to stand against the demonic tide.`,
+        "epic", [best.f.id], b.memberSects, cause);
+      b.formEvent = ev.id;
+    }
+  }
+
+  /* a fallen Heavenly Demon throws the cult into crisis — it usually shatters
+     (the alliance's hour of victory), but a successor may seize the throne and
+     the cult endures as an ordinary union. Resolved before the prune below so
+     the demon's defeat is narrated, not silently dropped as "no members left". */
+  const fallenCult = cultBloc();
+  if (fallenCult && fallenCult.threatLed && !threatActive) {
+    const ally = allianceBloc();
+    if (chance(.7) || !blocSects(fallenCult).length) {
+      const cause = STATE.lastThreatFall != null ? [STATE.lastThreatFall] : (fallenCult.formEvent != null ? [fallenCult.formEvent] : []);
+      const fell = dissolveBloc(fallenCult, "shatters without its 천마, its sects scattering back to the frontier", cause);
+      if (ally && ally.alive && ally.wonEvent == null) {
+        ally.wonEvent = chron("c-faction",
+          `${bref(ally)} stands triumphant: with the Demonic Path broken, the orthodox world rests — for a season — at peace beneath its 맹주.`,
+          "major", ally.leaderId != null ? [ally.leaderId] : [], ally.memberSects, fell ? [fell.id] : cause).id;
+      }
+    } else {
+      fallenCult.threatLed = false;
+      fallenCult.leaderId = null;   // force a 교주 succession struggle in the maintain loop
+    }
+  }
+
+  /* maintain membership and leadership */
+  for (const b of aliveBlocs()) {
+    b.memberSects = b.memberSects.filter(sid => {
+      const s = STATE.sects.find(x => x.id === sid);
+      return s && s.alive;
+    });
+    for (const s of aliveSects()) {
+      if (b.memberSects.includes(s.id)) continue;
+      if (b.type === "cult" && s.align === "demonic") b.memberSects.push(s.id);
+      else if (b.type === "alliance" && s.align === "orthodox" && chance(.5)) b.memberSects.push(s.id);
+    }
+    b.peakMembers = Math.max(b.peakMembers, b.memberSects.length);
+    if (!b.memberSects.length) { dissolveBloc(b, "crumbles to nothing, its banners abandoned to the wind"); continue; }
+    ensureBlocLeader(b);
+  }
+
+  /* the great war between the blocs — a clash of banners */
+  const A = allianceBloc(), C = cultBloc();
+  if (A && C && chance(.4)) {
+    const la = blocLeader(A), lc = blocLeader(C);
+    if (la && lc) {
+      chron("c-war",
+        `The banners of ${bref(A)} and ${bref(C)} clash in the field — ${pick(["ten thousand blades meet beneath a bleeding sky","the righteous and the demonic grind against one another","neither host yields a single pace"])}, and the realm holds its breath.`,
+        "normal", [la.id, lc.id], [], A.formEvent != null ? [A.formEvent] : []);
+    }
+  }
+
+  /* safety net: if a rival cult vanished by any path while the alliance still
+     stands, that too is a victory — the prelude to fracturing from within */
+  if (hadCult && !hadCult.alive && A && A.alive && A.wonEvent == null) {
+    A.wonEvent = chron("c-faction",
+      `${bref(A)} stands triumphant: with the Demonic Path broken, the orthodox world rests — for a season — at peace beneath its 맹주.`,
+      "major", A.leaderId != null ? [A.leaderId] : [], A.memberSects,
+      hadCult.dissolveEvent != null ? [hadCult.dissolveEvent] : []).id;
+  }
+
+  /* cohesion: the alliance frays once the common enemy is gone */
+  if (A && A.alive) {
+    const enemy = (cultBloc() && cultBloc().alive) || threatActive;
+    if (enemy) A.cohesion = clamp(A.cohesion + ri(2, 6), 0, 96);
+    else {
+      A.cohesion -= ri(9, 16);
+      if (A.cohesion <= 0) fractureAlliance(A);
+    }
+  }
+  /* the cult rots slowly from within even in victory */
+  const C2 = cultBloc();
+  if (C2 && C2.alive) {
+    C2.cohesion -= ri(2, 5);
+    if (C2.cohesion <= 0) dissolveBloc(C2, "collapses into warlord infighting, each 마두 claiming the throne for themselves",
+      C2.formEvent != null ? [C2.formEvent] : []);
+  }
+}
+
+/* ---- sect succession crises ---- */
+
+/* a head's death without a clear heir can shatter a sect — the breakaway
+   faction founds a rival house, seeding a future war (a Phase 2 causal chain). */
+function fractureSect(s, heir, rival, cause) {
+  const splinter = makeSect({ align: s.align, prestige: Math.round(s.prestige * 0.5) });
+  splinter.signatureArt = s.signatureArt;
+  splinter.founded = STATE.year;
+  const living = s.members.map(figById).filter(x => x && x.alive);
+  const moved = [];
+  for (const f of living) {
+    if (f === heir) continue;
+    if (f === rival || chance(.4)) {
+      s.members = s.members.filter(id => id !== f.id);
+      f.sect = splinter; addToSect(splinter, f); moved.push(f);
+    }
+  }
+  rival.sect = splinter; splinter.headId = rival.id;
+  s.headId = heir.id;
+  STATE.sects.push(splinter);
+  const ev = chron("c-schism",
+    `Succession strife splits ${sref(s)}: denied the seat of 장문인 that passed to ${ref(heir)}, ${ref(rival)} breaks away with ${moved.length} follower${moved.length === 1 ? "" : "s"} to found ${sref(splinter)}.`,
+    "major", [heir.id, rival.id], [s.id, splinter.id], cause);
+  splinter.fallEvent = null;
+  /* the schism births a mutual grudge — fuel for the wars to come */
+  addGrudge(rival, heir.id, { event: ev.id });
+  addGrudge(heir, rival.id, { event: ev.id });
+  return ev;
+}
+
+export function sysSuccession() {
+  for (const s of aliveSects()) {
+    const living = s.members.map(figById).filter(x => x && x.alive).sort((a, b) => b.power - a.power);
+    if (!living.length) { s.headId = null; continue; }
+    const top = living[0];
+    if (s.headId == null) { s.headId = top.id; continue; }
+    const head = figById(s.headId);
+    if (head && head.alive) {
+      /* a clearly stronger member may eclipse an aging head without crisis */
+      if (head.id !== top.id && top.power > head.power * 1.4 && chance(.2)) s.headId = top.id;
+      continue;
+    }
+    /* the 장문인 has died — is there a clear heir? */
+    const cause = head && head.fallEvent != null ? [head.fallEvent] : [];
+    const heirClear = top.realm >= 4 &&
+      (living.length < 2 || top.power >= living[1].power * 1.25) &&
+      (top.master === s.headId ||
+       (top.clan && head && head.clan && top.clan === head.clan) ||
+       chance(.4));
+    if (!heirClear && living.length >= 2 && chance(.55)) {
+      fractureSect(s, top, living[1], cause);
+    } else {
+      s.headId = top.id;
+      if (top.realm >= 4 && chance(.5)) {
+        chron("c-faction",
+          `${ref(top)} succeeds as 장문인 of ${sref(s)}, taking up the seat left empty${head ? ` by ${ref(head)}` : ""}.`,
+          "normal", [top.id], [s.id], cause);
+      }
+    }
+  }
+}
+
 export function sysGrudgeDecay() {
   for (const f of aliveFigs()) decayGrudges(f);
 }
@@ -510,10 +792,12 @@ export function tick() {
   sysFame();
   if (yearTurn) {
     sysAging();
+    sysSuccession();
     sysRecruitment();
     sysArtRefinement();
     sysRivalryAndWar();
     sysCorruptionAndThreat();
+    sysFactions();
     sysLostAndFound();
     sysSectFortune();
     sysHeroicArcs();

@@ -63,6 +63,15 @@ $("follow-clear").addEventListener("click", () => {
   renderLog(); renderPanels();
 });
 
+/* ---- follow: click a power bloc ---- */
+$("bloclist").addEventListener("click", e => {
+  const card = e.target.closest(".bloc-card");
+  if (card && card.dataset.id) {
+    setFollow('bloc', +card.dataset.id);
+    renderLog(); renderPanels();
+  }
+});
+
 /* ---- follow: click a sect card ---- */
 $("sectlist").addEventListener("click", e => {
   const card = e.target.closest(".sect");
@@ -90,7 +99,9 @@ $("dossier-wrap").addEventListener("click", e => {
   const ff = e.target.closest("[data-follow-fig]");
   if (ff) { setFollow('fig', +ff.dataset.followFig); renderLog(); renderPanels(); return; }
   const fs = e.target.closest("[data-follow-sect]");
-  if (fs) { setFollow('sect', +fs.dataset.followSect); renderLog(); renderPanels(); }
+  if (fs) { setFollow('sect', +fs.dataset.followSect); renderLog(); renderPanels(); return; }
+  const fb = e.target.closest("[data-follow-bloc]");
+  if (fb) { setFollow('bloc', +fb.dataset.followBloc); renderLog(); renderPanels(); }
 });
 
 /* ---- tree: navigate within the tree ---- */

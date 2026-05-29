@@ -176,6 +176,58 @@ export function buildFigDossier(f) {
   return h;
 }
 
+export function buildBlocDossier(b) {
+  const al = ALIGN[b.align];
+  const leader = b.leaderId != null ? figById(b.leaderId) : null;
+  const title = b.type === "alliance" ? "맹주 (Alliance Leader)" : "교주 (Cult Master)";
+  const flink = (f) => {
+    const n = f.byeolho && f.namedAt != null ? cap(f.byeolho.en) : f.name;
+    return `<span class="dos-link" data-follow-fig="${f.id}">${n}</span>`;
+  };
+  const sects = b.memberSects
+    .map(sid => STATE.sects.find(s => s.id === sid))
+    .filter(s => s && s.alive);
+
+  let h = `<div class="dossier" style="--c:${al.c}">`;
+  h += `<div class="dos-name">${b.kr}<span class="dos-kr"> · ${b.name}</span></div>`;
+  h += `<div class="dos-badges">`;
+  h += `<span class="dos-badge" style="border-color:${al.c};color:${al.c}">${b.type === "alliance" ? "正 Righteous Bloc" : "魔 Demonic Bloc"}</span>`;
+  h += `<span class="dos-badge ${b.alive ? 'dos-alive' : 'dos-dead'}">${b.alive ? '● Standing' : '✦ Dissolved'}</span>`;
+  if (b.threatLed) h += `<span class="dos-badge" style="border-color:var(--blood);color:var(--blood)">천마 Demon-Led</span>`;
+  h += `</div>`;
+  h += `<div class="dos-meta">Forged Year ${b.founded}${!b.alive && b.dissolvedYear ? ` · Dissolved Year ${b.dissolvedYear}` : ''} · ${b.memberSects.length} member sects (peak ${b.peakMembers})</div>`;
+  if (b.alive) {
+    h += `<div class="dos-conn"><span class="dos-role">Cohesion</span>${Math.round(b.cohesion)} / 100${b.cohesion < 35 ? ' — the bonds are fraying' : ''}</div>`;
+  }
+  if (leader) {
+    h += `<div class="dos-conn"><span class="dos-role">${title}</span>${flink(leader)}</div>`;
+  }
+
+  // causal traces
+  const traces = [];
+  if (b.formEvent != null) traces.push(`<button class="why-btn" data-chain="${b.formEvent}">⛓ Why it formed</button>`);
+  if (b.wonEvent != null) traces.push(`<button class="why-btn" data-chain="${b.wonEvent}">⛓ Its victory</button>`);
+  if (b.dissolveEvent != null) traces.push(`<button class="why-btn" data-chain="${b.dissolveEvent}">⛓ Why it ${b.type === "alliance" ? "fractured" : "fell"}</button>`);
+  if (traces.length) h += `<div class="dos-traces">${traces.join('')}</div>`;
+
+  // member sects
+  if (sects.length) {
+    h += `<div class="dos-sec">Member Houses</div>`;
+    h += `<div class="dos-timeline">`;
+    const sorted = [...sects].sort((a, c) => c.prestige - a.prestige);
+    for (const s of sorted.slice(0, 12)) {
+      h += `<div class="dos-trow"><span class="dos-link" data-follow-sect="${s.id}">${s.kr} <span class="dos-tkr">${s.name}</span></span></div>`;
+    }
+    if (sorted.length > 12) h += `<div class="dos-empty">+${sorted.length - 12} more</div>`;
+    h += `</div>`;
+  } else if (!b.alive) {
+    h += `<div class="dos-empty">Its banners are scattered to the wind.</div>`;
+  }
+
+  h += `</div>`;
+  return h;
+}
+
 export function buildSectDossier(s) {
   const al = ALIGN[s.align];
   const living = s.members.map(figById).filter(x => x && x.alive);

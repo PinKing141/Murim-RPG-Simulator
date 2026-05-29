@@ -112,6 +112,28 @@ button.ctl.primary:hover { box-shadow: 0 0 16px rgba(201,162,39,.25); }
 .sect-meta b { color: var(--ink-dim); font-weight: 500; }
 .pbar { height: 3px; background: #0c0b08; border-radius: 2px; margin-top: 7px; overflow: hidden; }
 .pbar i { display: block; height: 100%; background: var(--c); opacity: .7; }
+.sect-bloc {
+  margin-top: 6px; font-family: 'Noto Serif KR', serif; font-size: 10.5px;
+  color: var(--bc); letter-spacing: .04em; opacity: .9;
+}
+
+/* ---- Power blocs ---- */
+#bloclist { margin-bottom: 6px; }
+.bloc-card {
+  border: 1px solid var(--c); border-radius: 4px; padding: 10px 12px; margin-bottom: 9px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 12%, var(--paper-2)), var(--paper-2));
+  cursor: pointer; transition: .15s; position: relative; overflow: hidden;
+}
+.bloc-card:hover { transform: translateX(2px); box-shadow: 0 0 14px -4px var(--c); }
+.bloc-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--c); }
+.bloc-card.followed { box-shadow: 0 0 0 1px var(--gold) inset; }
+.bloc-name { font-family: 'Noto Serif KR', serif; font-weight: 600; font-size: 16px; color: var(--ink); }
+.bloc-name .en { display: block; font-family: 'Cinzel', serif; font-size: 11px; color: var(--ink-dim); letter-spacing: .06em; font-style: normal; }
+.bloc-meta { display: flex; justify-content: space-between; gap: 10px; margin-top: 6px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--ink-faint); }
+.bloc-meta b { color: var(--c); font-weight: 500; }
+.bloc-coh { display: flex; align-items: center; gap: 8px; margin-top: 7px; }
+.bloc-coh > span { font-family: 'Noto Serif KR', serif; font-size: 10px; color: var(--ink-faint); }
+.bloc-coh .mini { flex: 1; }
 
 /* ---- Chronicle ---- */
 .chronicle { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
@@ -145,6 +167,7 @@ button.ctl.primary:hover { box-shadow: 0 0 16px rgba(201,162,39,.25); }
 .entry .txt { font-size: 18.5px; line-height: 1.46; color: var(--ink); }
 .entry .txt .nm  { color: var(--gold-bright); font-weight: 600; font-style: italic; }
 .entry .txt .sn  { color: var(--azure); font-weight: 500; }
+.entry .txt .bn  { color: var(--gold); font-weight: 600; letter-spacing: .02em; }
 .entry .txt em.art { color: var(--violet); font-style: italic; }
 .entry .tag {
   font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: .1em;
@@ -169,6 +192,8 @@ button.ctl.primary:hover { box-shadow: 0 0 16px rgba(201,162,39,.25); }
 .c-birth       { --dot: var(--jade); }
 .c-vengeance   { --dot: var(--blood); }
 .c-bloodline   { --dot: #9b59b6; }
+.c-faction     { --dot: var(--gold-bright); }
+.c-schism      { --dot: #c0593f; }
 
 /* ---- Figures ---- */
 .figcard {
@@ -380,6 +405,7 @@ button.ctl.primary:hover { box-shadow: 0 0 16px rgba(201,162,39,.25); }
 .chain-text { font-family: 'Cormorant Garamond', serif; font-size: 15px; line-height: 1.4; color: var(--ink); }
 .chain-text .nm { color: var(--gold-bright); font-weight: 600; font-style: italic; }
 .chain-text .sn { color: var(--azure); font-weight: 500; }
+.chain-text .bn { color: var(--gold); font-weight: 600; }
 .chain-text em.art { color: var(--violet); font-style: italic; }
 
 .chain-link { text-align: center; color: var(--ink-faint); font-size: 13px; line-height: 1; padding: 4px 0; }
@@ -396,6 +422,8 @@ button.ctl.primary:hover { box-shadow: 0 0 16px rgba(201,162,39,.25); }
 .chain-row.c-birth     { --dot: var(--jade); }
 .chain-row.c-vengeance { --dot: var(--blood); }
 .chain-row.c-bloodline { --dot: #9b59b6; }
+.chain-row.c-faction   { --dot: var(--gold-bright); }
+.chain-row.c-schism    { --dot: #c0593f; }
 
 .chain-empty { font-family: 'Cormorant Garamond', serif; font-style: italic; color: var(--ink-dim); text-align: center; padding: 16px; }
 
