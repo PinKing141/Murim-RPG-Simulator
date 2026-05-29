@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Murim Chronicle — 무림풍운록</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Noto+Serif+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#e8ddc7;
+    --ink-dim:#9a8f78;
+    --ink-faint:#6b6253;
+    --paper:#100f0c;
+    --paper-2:#171611;
+    --paper-3:#1f1d16;
+    --line:#322e22;
+    --gold:#c9a227;
+    --gold-bright:#e8c560;
+    --jade:#5aa37c;
+    --blood:#a3392f;
+    --azure:#5a7fa3;
+    --violet:#8b6db0;
+    --jeongpa:#5aa37c;     /* orthodox  */
+    --sapa:#c79a3a;        /* unorthodox*/
+    --magyo:#a3392f;       /* demonic   */
+    --eunja:#7a8694;       /* recluse   */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:
+      radial-gradient(1200px 800px at 80% -10%, #1c1a13 0%, transparent 60%),
+      radial-gradient(900px 700px at -10% 110%, #1a1410 0%, transparent 55%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Cormorant Garamond',serif;
+    font-size:18px;
+    line-height:1.5;
+    overflow:hidden;
+  }
+  body::before{
+    content:"";
+    position:fixed;inset:0;pointer-events:none;z-index:9999;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    mix-blend-mode:overlay;
+  }
+
+  .app{display:grid;grid-template-columns:300px 1fr 320px;height:100vh}
+
+  /* ============ HEADER ============ */
+  .topbar{
+    grid-column:1 / -1;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 26px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#16140f,#100f0b);
+  }
+  .brand{display:flex;align-items:baseline;gap:16px}
+  .brand h1{
+    font-family:'Cinzel',serif;font-weight:600;font-size:22px;
+    letter-spacing:.06em;color:var(--gold-bright);
+    text-shadow:0 0 18px rgba(201,162,39,.25);
+  }
+  .brand .kr{font-family:'Noto Serif KR',serif;color:var(--ink-dim);font-size:18px;letter-spacing:.14em}
+  .era{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-dim);letter-spacing:.08em}
+  .era b{color:var(--gold);font-weight:500}
+
+  .controls{display:flex;align-items:center;gap:10px}
+  button.ctl{
+    font-family:'Cinzel',serif;font-size:12px;letter-spacing:.08em;
+    background:var(--paper-3);color:var(--ink);
+    border:1px solid var(--line);border-radius:3px;
+    padding:8px 14px;cursor:pointer;transition:.15s;
+  }
+  button.ctl:hover{border-color:var(--gold);color:var(--gold-bright);background:#26231a}
+  button.ctl.primary{background:linear-gradient(180deg,#3a3118,#2a2412);border-color:#5a4d24;color:var(--gold-bright)}
+  button.ctl.primary:hover{box-shadow:0 0 16px rgba(201,162,39,.25)}
+  .speed{display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+  .speed button{background:var(--paper-2);border:none;color:var(--ink-dim);font-family:'JetBrains Mono',monospace;font-size:12px;padding:8px 11px;cursor:pointer}
+  .speed button.on{background:#2a2412;color:var(--gold-bright)}
+
+  /* ============ PANELS ============ */
+  .panel{overflow-y:auto;padding:18px 16px}
+  .panel.left{border-right:1px solid var(--line);background:linear-gradient(180deg,#13120d,#100f0b)}
+  .panel.right{border-left:1px solid var(--line);background:linear-gradient(180deg,#13120d,#100f0b)}
+  .panel-title{
+    font-family:'Cinzel',serif;font-size:12px;letter-spacing:.18em;
+    color:var(--ink-faint);text-transform:uppercase;
+    padding-bottom:8px;margin-bottom:12px;border-bottom:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .panel-title .ct{font-family:'JetBrains Mono',monospace;color:var(--gold);font-size:11px}
+
+  .sect{
+    border:1px solid var(--line);border-radius:4px;padding:10px 12px;margin-bottom:9px;
+    background:var(--paper-2);cursor:pointer;transition:.15s;position:relative;overflow:hidden;
+  }
+  .sect:hover{border-color:#534a30;transform:translateX(2px)}
+  .sect::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c)}
+  .sect.dead{opacity:.34;filter:grayscale(.6)}
+  .sect-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .sect-name{font-family:'Noto Serif KR',serif;font-weight:500;font-size:16px;color:var(--ink)}
+  .sect-name .en{display:block;font-family:'Cormorant Garamond',serif;font-size:13px;color:var(--ink-dim);font-style:italic;letter-spacing:.02em}
+  .sect-tier{font-family:'Noto Serif KR',serif;font-size:11px;color:var(--c);white-space:nowrap;border:1px solid var(--c);padding:1px 6px;border-radius:2px;opacity:.85}
+  .sect-meta{display:flex;gap:12px;margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-faint)}
+  .sect-meta b{color:var(--ink-dim);font-weight:500}
+  .pbar{height:3px;background:#0c0b08;border-radius:2px;margin-top:7px;overflow:hidden}
+  .pbar i{display:block;height:100%;background:var(--c);opacity:.7}
+
+  /* ============ CHRONICLE ============ */
+  .chronicle{display:flex;flex-direction:column;min-height:0}
+  .chron-scroll{flex:1;overflow-y:auto;padding:24px 40px 60px;position:relative}
+  .chron-scroll::before{
+    content:"";position:absolute;left:64px;top:0;bottom:0;width:1px;
+    background:linear-gradient(180deg,transparent,var(--line) 8%,var(--line) 92%,transparent);
+  }
+  .yearmark{
+    position:sticky;top:0;z-index:5;
+    display:flex;align-items:center;gap:14px;
+    padding:14px 0 10px;margin-left:-40px;padding-left:40px;
+    background:linear-gradient(180deg,var(--paper) 60%,transparent);
+  }
+  .yearmark .y{
+    font-family:'Cinzel',serif;font-weight:700;font-size:15px;color:var(--gold-bright);
+    background:var(--paper);padding:3px 12px;border:1px solid #4a3f1e;border-radius:14px;
+    letter-spacing:.05em;z-index:2;
+  }
+  .yearmark .ystat{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-faint);letter-spacing:.04em}
+
+  .entry{
+    position:relative;padding:7px 0 7px 56px;margin-left:8px;
+    animation:rise .5s ease both;
+  }
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .entry::before{
+    content:"";position:absolute;left:23px;top:14px;width:9px;height:9px;border-radius:50%;
+    background:var(--paper);border:2px solid var(--dot,var(--ink-faint));z-index:2;
+  }
+  .entry .txt{font-size:18.5px;line-height:1.46;color:var(--ink)}
+  .entry .txt .nm{color:var(--gold-bright);font-weight:600;font-style:italic}
+  .entry .txt .sn{color:var(--azure);font-weight:500}
+  .entry .txt em.art{color:var(--violet);font-style:italic}
+  .entry .tag{
+    font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--dot);opacity:.8;margin-right:8px;
+  }
+  .entry.major .txt{font-size:20px}
+  .entry.major::before{width:11px;height:11px;left:22px;box-shadow:0 0 10px var(--dot)}
+  .entry.epic{
+    background:linear-gradient(90deg,rgba(163,57,47,.08),transparent 70%);
+    border-left:2px solid var(--dot);margin-left:0;padding-left:64px;border-radius:0 4px 4px 0;
+  }
+  .entry.epic .txt{font-family:'Cormorant Garamond',serif;font-size:21px}
+
+  .c-found{--dot:var(--jade)} .c-break{--dot:var(--gold-bright)} .c-war{--dot:var(--blood)}
+  .c-death{--dot:var(--ink-faint)} .c-art{--dot:var(--violet)} .c-fall{--dot:#7a3030}
+  .c-rise{--dot:var(--gold-bright)} .c-corrupt{--dot:var(--magyo)} .c-duel{--dot:var(--azure)}
+  .c-lost{--dot:var(--eunja)} .c-found2{--dot:var(--jade)} .c-threat{--dot:#d14b3a}
+  .c-peace{--dot:var(--jade)} .c-lineage{--dot:var(--sapa)}
+
+  /* ============ FIGURES ============ */
+  .figcard{
+    border:1px solid var(--line);border-radius:4px;padding:11px 12px;margin-bottom:9px;
+    background:var(--paper-2);position:relative;overflow:hidden;
+  }
+  .figcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c)}
+  .fig-name{font-family:'Cinzel',serif;font-size:15px;color:var(--ink);font-weight:500}
+  .fig-alias{font-style:italic;color:var(--c);font-size:15px;font-family:'Cormorant Garamond',serif}
+  .fig-sub{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-faint);margin-top:3px;letter-spacing:.03em}
+  .fig-realm{display:inline-block;font-family:'Noto Serif KR',serif;font-size:10.5px;color:var(--c);border:1px solid var(--c);padding:1px 6px;border-radius:2px;margin-top:6px;opacity:.88}
+  .fig-bars{margin-top:8px;display:grid;grid-template-columns:auto 1fr;gap:3px 8px;align-items:center}
+  .fig-bars span{font-family:'Noto Serif KR',serif;font-size:10px;color:var(--ink-faint)}
+  .mini{height:4px;background:#0c0b08;border-radius:2px;overflow:hidden}
+  .mini i{display:block;height:100%}
+
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px}
+  .stat{border:1px solid var(--line);border-radius:4px;padding:9px 11px;background:var(--paper-2)}
+  .stat .v{font-family:'Cinzel',serif;font-size:22px;color:var(--gold-bright);line-height:1}
+  .stat .l{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--ink-faint);letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
+
+  .legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:16px;font-family:'Noto Serif KR',serif;font-size:11px;color:var(--ink-dim)}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:#2a271d;border-radius:5px;border:2px solid var(--paper)}
+  ::-webkit-scrollbar-thumb:hover{background:#3a3526}
+
+  .footer-note{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--ink-faint);text-align:center;padding:12px;border-top:1px solid var(--line)}
+
+  @media (max-width:1100px){
+    .app{grid-template-columns:1fr}
+    .panel.left,.panel.right{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <h1>The Murim Chronicle</h1>
+      <span class="kr">무림풍운록</span>
+    </div>
+    <div class="era" id="era">Year <b id="yr">1</b> · <span id="season">Spring</span> · <span id="alive">0</span> souls of the Murim</div>
+    <div class="controls">
+      <div class="speed" id="speed">
+        <button data-s="900">▮</button>
+        <button data-s="420" class="on">▮▮</button>
+        <button data-s="160">▮▮▮</button>
+        <button data-s="40">▮▮▮▮</button>
+      </div>
+      <button class="ctl" id="pause">❚❚ Pause</button>
+      <button class="ctl primary" id="reseed">↻ New Age</button>
+    </div>
+  </div>
+
+  <aside class="panel left">
+    <div class="panel-title">Sects of the Murim <span class="ct" id="sectct">0</span></div>
+    <div id="sectlist"></div>
+  </aside>
+
+  <main class="chronicle">
+    <div class="chron-scroll" id="chron"></div>
+    <div class="footer-note" id="fnote">The brush records all. Scroll up to read the past.</div>
+  </main>
+
+  <aside class="panel right">
+    <div class="panel-title">State of the Murim</div>
+    <div class="stat-grid">
+      <div class="stat"><div class="v" id="s-fig">0</div><div class="l">Martial Artists</div></div>
+      <div class="stat"><div class="v" id="s-war">0</div><div class="l">Active Wars</div></div>
+      <div class="stat"><div class="v" id="s-art">0</div><div class="l">Living Arts</div></div>
+      <div class="stat"><div class="v" id="s-lost">0</div><div class="l">Lost Arts</div></div>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--jeongpa)"></i>정파 Orthodox</span>
+      <span><i style="background:var(--sapa)"></i>사파 Unorthodox</span>
+      <span><i style="background:var(--magyo)"></i>마교 Demonic</span>
+      <span><i style="background:var(--eunja)"></i>은자 Recluse</span>
+    </div>
+    <div class="panel-title">The Mighty <span class="ct" id="figct">0</span></div>
+    <div id="figlist"></div>
+  </aside>
+
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   THE MURIM CHRONICLE — 무림풍운록
+   A deterministic, no-player Korean-murim simulation.
+   Layering: seeded core · per-season controller · DOM runner.
+   ===================================================================== */
+
+/* ---------- seeded RNG (mulberry32) ---------- */
+function makeRNG(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+let rng = makeRNG(Date.now() & 0xffffffff);
+const rand = ()=>rng();
+const ri = (lo,hi)=>Math.floor(rand()*(hi-lo+1))+lo;
+const pick = arr=>arr[Math.floor(rand()*arr.length)];
+const chance = p=>rand()<p;
+const clamp = (v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+const cap = s=>s.charAt(0).toUpperCase()+s.slice(1);
+
+/* ---------- Korean name & flavour data ---------- */
+const SURNAMES = ["Kim","Lee","Park","Choi","Jung","Kang","Cho","Yoon","Jang","Lim","Han","Oh","Seo","Shin","Kwon","Hwang","Ahn","Song","Yoo","Hong","Baek","Heo","Nam","Moon","Yang","Bae","Ko","No","Sim","Jeon"];
+const CLAN_SURNAMES = ["Namgung","Jegal","Dang","Moyong","Hwangbo","Sima","Dokgo","Seonu"]; // sino-Korean martial clans
+const GIVEN = ["Mu-jin","Cheon","Ho","Jin","Woon","Hyuk","Seol","Yeon","Rin","Hwi","Gang","Tae-ho","Jun","Hye-rin","Soo","Min","Seong","Hyun","Woo","Jae","Yul","Cheol","Baek","Ryeon","Dae","Gyeom","Sa-hyeon","Ui","Beom","Sang","Eun","Yeo-wol","Ha-rin","Mu-gak","Seo-rin"];
+
+/* byeolho (별호) builder — prefix + suffix, with hangul + meaning */
+const BH_PRE = [
+  ["Hyeol","혈","Blood"],["Geom","검","Sword"],["Do","도","Saber"],["Gwon","권","Fist"],
+  ["Bing","빙","Ice"],["Hwa","화","Fire"],["Noe","뇌","Thunder"],["Gwi","귀","Ghost"],
+  ["Ma","마","Demon"],["Cheon","천","Heaven"],["Pae","패","Tyrant"],["Gwang","광","Mad"],
+  ["Dok","독","Poison"],["Eum","음","Shadow"],["Cheong","청","Azure"],["Baek","백","White"],
+  ["Geum","금","Golden"],["Cheol","철","Iron"],["Mu","무","Formless"],["Jeol","절","Severing"]
+];
+const BH_SUF = [
+  ["sin","신","God"],["wang","왕","King"],["jon","존","Venerable"],["ma","마","Demon"],
+  ["gwi","귀","Ghost"],["hyeop","협","Hero"],["gun","군","Lord"],["gaek","객","Wanderer"],
+  ["seon","선","Immortal"],["gwon","권","Fist"],["geom","검","Blade"]
+];
+
+/* sect name builder */
+const SECT_PRE = [
+  ["Cheongun","청운","Azure Cloud"],["Hwasan","화산","Mount Hwa"],["Cheongeom","천검","Heaven Sword"],
+  ["Hyeolcheon","혈천","Blood Heaven"],["Mandok","만독","Myriad Poison"],["Irwol","일월","Sun-Moon"],
+  ["Cheonryong","천룡","Heaven Dragon"],["Bingbaek","빙백","Frost-White"],["Heukpung","흑풍","Black Wind"],
+  ["Jaha","자하","Purple Mist"],["Gwangnoe","광뢰","Roaring Thunder"],["Mugeuk","무극","Limitless"],
+  ["Dansim","단심","Crimson Heart"],["Nakseong","낙성","Falling Star"],["Gwigok","귀곡","Ghost Valley"],
+  ["Cheolhyeol","철혈","Iron Blood"],["Odok","오독","Five Poison"],["Maehwa","매화","Plum Blossom"],
+  ["Sammun","삼문","Triple Gate"],["Geummun","금문","Golden Gate"],["Seolhwa","설화","Snowfire"],
+  ["Buljimun","불지","Buddha's Will"]
+];
+const SECT_SUF = [
+  ["pa","파","Sect"],["sega","세가","Clan"],["sega","세가","Clan"],["mun","문","Gate"],
+  ["gyo","교","Cult"],["bang","방","Gang"],["gok","곡","Valley"],["jang","장","Manor"],
+  ["seong","성","Fortress"],["gung","궁","Palace"],["dan","단","Order"]
+];
+
+const ART_PRE = [
+  ["Cheonma","천마","Heavenly Demon"],["Taegeuk","태극","Supreme Polarity"],["Maehwa","매화","Plum Blossom"],
+  ["Guyang","구양","Nine Yang"],["Heupseong","흡성","Star-Devouring"],["Hyeolma","혈마","Blood Demon"],
+  ["Jaha","자하","Purple Mist"],["Bukmyeong","북명","Northern Abyss"],["Musang","무상","Formless"],
+  ["Pacheon","파천","Heaven-Splitting"],["Myeoljeol","멸절","Annihilation"],["Bingbaek","빙백","Frost-White"],
+  ["Cheonnoe","천뢰","Heaven's Thunder"],["Mangeuk","만극","Ten Thousand Ends"],["Geumgang","금강","Adamant"]
+];
+const ART_SUF = [
+  ["Singong","신공","Divine Art"],["Geombeop","검법","Sword Art"],["Dobeop","도법","Saber Art"],
+  ["Gwonbeop","권법","Fist Art"],["Jangbeop","장법","Palm Art"],["Simbeop","심법","Heart Method"],
+  ["Bobeop","보법","Step Method"],["Jibeop","지법","Finger Art"],["Sinbeop","신법","Movement Art"]
+];
+
+const REGIONS = ["the Central Plains (중원)","the Southern Marches","the Sacheon basin","the Frostbound North","the Misted East","the Demonic Frontier (새외)","the Imperial Capital","the Jade Coast","the Ten-Thousand Peaks","the Bleak Steppe"];
+const WAR_NAMES = [
+  ["the Great Orthodox-Demon War","정마대전"],["the Blood Calamity","무림혈겁"],
+  ["the Ten-Year War","십년대전"],["the Struggle for Supremacy","천하쟁패"],
+  ["the Demonic Cult Rebellion","마교의 난"],["the Great Unorthodox Chaos","사파대란"],
+  ["the War of Drawn Sabers","발도지란"],["the Schism of the Nine Sects","구파분란"]
+];
+
+/* alignment / faction bands */
+const ALIGN = {
+  orthodox:{key:"orthodox",label:"Orthodox",kr:"정파",c:"var(--jeongpa)"},
+  unorthodox:{key:"unorthodox",label:"Unorthodox",kr:"사파",c:"var(--sapa)"},
+  demonic:{key:"demonic",label:"Demonic",kr:"마교",c:"var(--magyo)"},
+  recluse:{key:"recluse",label:"Recluse",kr:"은자",c:"var(--eunja)"}
+};
+
+/* the Korean murim cultivation ladder (무공 경지) */
+const REALMS = ["Third-Rate","Second-Rate","First-Rate","Peak","Transcendent","Form Realm","Profound Realm","Life-Death Realm","Nature Realm"];
+const REALM_KR = ["삼류","이류","일류","절정","초절정","화경","현경","생사경","자연경"];
+const APEX = REALMS.length-1; // Nature Realm
+
+const PATH_FLAVOR = {
+  orthodox:{verb:"attained",via:["through disciplined meditation","by tempering the heart against desire","following the righteous canon","after a decade of ascetic refinement"]},
+  unorthodox:{verb:"forced open",via:["by absorbing a rival's naegong","through ingenious but forbidden shortcuts","at the cost of a shortened life","with a pill of dubious origin"]},
+  demonic:{verb:"seized",via:["by devouring the energy of the slain","through the blood of a hundred enemies","at the price of their remaining humanity","by feeding the demonic art within"]},
+  recluse:{verb:"quietly reached",via:["in solitude upon a nameless peak","having forgotten the affairs of men","while listening to the mountain rain","after a lifetime of stillness"]}
+};
+
+/* =====================================================================
+   STATE & ENTITIES
+   ===================================================================== */
+let STATE;
+function newId(){ return STATE.idc++; }
+
+function makeName(){
+  if(chance(.22)) return pick(CLAN_SURNAMES)+" "+pick(GIVEN);
+  return pick(SURNAMES)+" "+pick(GIVEN);
+}
+function makeByeolho(){
+  const p=pick(BH_PRE), s=pick(BH_SUF);
+  return { roman: p[0]+s[0], kr: p[1]+s[1], en: "the "+p[2]+" "+s[2] };
+}
+function makeSectName(align){
+  const p=pick(SECT_PRE);
+  let s;
+  // demonic houses lean toward 교(Cult); clans use 세가
+  if(align==="demonic") s = chance(.5)? ["gyo","교","Cult"] : pick(SECT_SUF);
+  else s = pick(SECT_SUF);
+  return { roman:p[0]+s[0], kr:p[1]+s[1], en:p[2]+" "+s[2] };
+}
+function makeArtName(){
+  const p=pick(ART_PRE), s=pick(ART_SUF);
+  return { roman:p[0]+" "+s[0], kr:p[1]+s[1], en:p[2]+" "+s[2] };
+}
+
+function makeArt(align){
+  const nm = makeArtName();
+  return {
+    id:newId(), kind:"art",
+    name:nm.en, kr:nm.kr, roman:nm.roman,
+    tier: ri(2,6),
+    align,
+    corruption: align==="demonic"? ri(35,70) : align==="unorthodox"? ri(15,40) : ri(0,12),
+    lost:false, dormant:false,
+    holders:0, origin:STATE.year, lostYear:null,
+    lostHolder:null
+  };
+}
+
+function makeFigure(opts={}){
+  const align = opts.align || pick(["orthodox","orthodox","unorthodox","demonic","recluse"]);
+  const talent = opts.talent!=null?opts.talent:ri(20,80);
+  const f={
+    id:newId(), kind:"fig",
+    name: opts.name||makeName(),
+    byeolho:null,
+    align, talent,
+    realm: opts.realm!=null?opts.realm:0,
+    progress: rand()*40,
+    age: opts.age!=null?opts.age:ri(14,22),
+    lifespan:0, power:0,
+    fame: opts.fame||ri(0,8),
+    alignmentDrift: align==="demonic"?ri(40,65):align==="unorthodox"?ri(20,40):ri(0,15),
+    sect: opts.sect||null,
+    art: opts.art||null,
+    master: opts.master||null,
+    lineage: opts.lineage||null,
+    alive:true, born:STATE.year,
+    isThreat:false, namedAt:null,
+    grudges:[]
+  };
+  recomputeLife(f); recomputePower(f);
+  return f;
+}
+function recomputeLife(f){
+  let base = 58 + f.realm*22 + Math.floor(f.talent/4);
+  if(f.align==="demonic") base -= 18;
+  if(f.align==="recluse") base += 30;
+  f.lifespan = base;
+}
+function recomputePower(f){
+  let p = f.realm*100 + f.progress + f.talent*1.5;
+  if(f.art) p += f.art.tier*30;
+  f.power = Math.round(p);
+}
+
+function makeSect(opts={}){
+  const align = opts.align || pick(["orthodox","orthodox","orthodox","unorthodox","demonic","recluse"]);
+  const nm = makeSectName(align);
+  return {
+    id:newId(), kind:"sect",
+    name:nm.en, kr:nm.kr, roman:nm.roman,
+    align,
+    region: opts.region||pick(REGIONS),
+    founded:STATE.year,
+    prestige: opts.prestige!=null?opts.prestige:ri(25,55),
+    members:[],
+    signatureArt:null,
+    alive:true, deadYear:null,
+    atWarWith:[]
+  };
+}
+
+/* =====================================================================
+   CHRONICLE REFERENCES
+   ===================================================================== */
+function ref(f){
+  if(!f) return "an unknown";
+  if(f.byeolho && f.namedAt!=null) return `<span class="nm">${cap(f.byeolho.en)} (${f.byeolho.kr})</span>`;
+  return `<span class="nm">${f.name}</span>`;
+}
+function plainRef(f){ return `<span class="nm">${f.name}</span>`; }
+function sref(s){ return s? `<span class="sn">${s.name} (${s.kr})</span>` : "a vanished house"; }
+function aref(a){ return a? `<em class="art">${a.name} (${a.kr})</em>` : "a forgotten art"; }
+
+function chron(cls, html, level){
+  STATE.log.push({year:STATE.year, season:STATE.season, cls, html, level:level||"normal"});
+  STATE.dirtyLog=true;
+}
+
+/* =====================================================================
+   GENESIS
+   ===================================================================== */
+function genesis(seed){
+  rng = makeRNG(seed>>>0);
+  STATE = {
+    idc:1, year:1, season:0, seasonNames:["Spring","Summer","Autumn","Winter"],
+    figures:[], sects:[], arts:[],
+    log:[], dirtyLog:true, dirtyPanels:true,
+    activeWars:[], threatActive:false, seed
+  };
+
+  const nArt = ri(5,7);
+  for(let i=0;i<nArt;i++) STATE.arts.push(makeArt(pick(["orthodox","orthodox","unorthodox","demonic"])));
+
+  const nSect = ri(5,7);
+  for(let i=0;i<nSect;i++){
+    const s = makeSect();
+    STATE.sects.push(s);
+    const cand = STATE.arts.filter(a=>!a.lost && a.align===s.align);
+    s.signatureArt = cand.length? pick(cand) : pick(STATE.arts);
+    s.signatureArt.holders++;
+    for(let j=0;j<ri(3,5);j++){
+      const f=makeFigure({align:s.align,sect:s,art:s.signatureArt,realm:ri(2,4),age:ri(28,55)});
+      s.members.push(f.id); STATE.figures.push(f);
+    }
+    const founder=makeFigure({align:s.align,sect:s,art:s.signatureArt,realm:ri(4,6),age:ri(48,70),talent:ri(55,90)});
+    maybeName(founder, true);
+    s.members.push(founder.id); STATE.figures.push(founder);
+    const head = s.align==="demonic"?"Cult Master (교주)": s.align==="orthodox"?"Sect Master (장문인)":"Lord";
+    chron("c-found", `${sref(s)} is founded in ${s.region} by ${ref(founder)}, ${head} of the house, who wields ${aref(s.signatureArt)}.`, "major");
+  }
+  for(let i=0;i<ri(3,6);i++){
+    const f=makeFigure({align:pick(["recluse","unorthodox","orthodox"]),realm:ri(1,3),age:ri(20,40)});
+    STATE.figures.push(f);
+  }
+  chron("c-peace", `The Murim stirs awake. ${STATE.sects.length} great houses stand across the Gangho, and the rivers and lakes brim with ambition.`, "epic");
+}
+
+/* =====================================================================
+   HELPERS
+   ===================================================================== */
+const aliveFigs = ()=>STATE.figures.filter(f=>f.alive);
+const aliveSects = ()=>STATE.sects.filter(s=>s.alive);
+const figById = id=>STATE.figures.find(f=>f.id===id);
+
+function maybeName(f, force){
+  if(f.namedAt!=null) return;
+  if(force || (f.realm>=3 && f.fame>=14)){
+    f.byeolho = makeByeolho();
+    f.namedAt = STATE.year;
+    chron("c-rise", `${plainRef(f)}${f.sect?" of "+f.sect.name+" ("+f.sect.kr+")":""} has won renown across the land, now spoken of as <span class="nm">${cap(f.byeolho.en)} (${f.byeolho.kr})</span>.`, "major");
+  }
+}
+
+function alignShift(f, amount, reason){
+  const before = f.align;
+  f.alignmentDrift = clamp(f.alignmentDrift + amount, 0, 100);
+  let na;
+  if(f.alignmentDrift>=72) na="demonic";
+  else if(f.alignmentDrift>=42) na="unorthodox";
+  else if(f.alignmentDrift<=10 && f.align!=="recluse") na="orthodox";
+  else na=f.align;
+  if(na!==before && f.align!=="recluse"){
+    f.align=na;
+    if(na==="demonic"){
+      chron("c-corrupt", `${ref(f)} has fallen to the Demonic Path (마도)${reason?" — "+reason:""}. The energy about them turns cold and ravenous.`, "major");
+    } else if(na==="unorthodox" && before==="orthodox"){
+      chron("c-corrupt", `${ref(f)} forsakes the orthodox canon for unorthodox methods${reason?" after "+reason:""}.`, "normal");
+    }
+    recomputeLife(f);
+  }
+}
+
+/* =====================================================================
+   TICK SYSTEMS — one season per tick, four ticks per year
+   ===================================================================== */
+function tick(){
+  STATE.season++;
+  if(STATE.season>3){ STATE.season=0; STATE.year++; }
+  const yearTurn = STATE.season===0;
+
+  sysCultivation();
+  sysFame();
+  if(yearTurn){
+    sysAging();
+    sysRecruitment();
+    sysArtRefinement();
+    sysRivalryAndWar();
+    sysCorruptionAndThreat();
+    sysLostAndFound();
+    sysSectFortune();
+    sysHeroicArcs();
+  }
+  STATE.dirtyPanels=true;
+}
+
+function sysCultivation(){
+  for(const f of aliveFigs()){
+    if(f.realm>=APEX){ f.progress=100; continue; }
+    let gain = (f.talent/30) + rand()*4;
+    if(f.align==="demonic") gain*=1.25;
+    if(f.align==="recluse") gain*=0.8;
+    if(f.sect) gain*=1.1;
+    f.progress += gain;
+    if(f.progress>=100){
+      f.progress=0; f.realm++;
+      recomputeLife(f); recomputePower(f);
+      f.fame += 3 + f.realm;
+      const fl=PATH_FLAVOR[f.align];
+      if(f.realm>=3){
+        const lvl = f.realm>=6?"major":"normal";
+        chron("c-break", `${ref(f)} ${fl.verb} the realm of <b style="color:var(--gold)">${REALMS[f.realm]} (${REALM_KR[f.realm]})</b>, ${pick(fl.via)}.`, lvl);
+      }
+      maybeName(f);
+      if(f.realm===APEX){
+        chron("c-break", `Heaven itself takes notice: ${ref(f)} has touched the <b style="color:var(--gold-bright)">Nature Realm (자연경)</b>, the apex no mortal is meant to reach.`, "epic");
+      }
+    }
+  }
+}
+
+function sysFame(){
+  for(const f of aliveFigs()){
+    if(chance(.04)){ f.fame += rand()*2; maybeName(f); }
+  }
+}
+
+function sysAging(){
+  for(const f of aliveFigs()){
+    f.age++;
+    const over = f.age - f.lifespan;
+    let deathP = over>0 ? 0.18 + over*0.05 : (f.age>f.lifespan-10? 0.02:0.004);
+    if(f.align==="demonic") deathP+=0.01;
+    if(chance(deathP)) killFigure(f, "passes from the world, their naegong returning to heaven and earth");
+  }
+}
+
+function killFigure(f, why){
+  f.alive=false; f.diedYear=STATE.year;
+  if(f.sect){ f.sect.members=f.sect.members.filter(id=>id!==f.id); }
+  if(f.art) f.art.holders=Math.max(0,f.art.holders-1);
+  if(f.namedAt!=null || f.realm>=4){
+    const lvl = f.realm>=6? "major":"normal";
+    chron("c-death", `${ref(f)}${f.sect?" of "+f.sect.name:""} ${why}. ${f.realm>=6?"An age ends with them.":""}`, lvl);
+    if(f.isThreat){
+      STATE.threatActive=false;
+      chron("c-peace", `With the fall of the Heavenly Demon, the Murim exhales. Yet ${aref(f.art)} was never recovered...`, "major");
+      if(f.art){ f.art.dormant=true; f.art.lostHolder=f.name; }
+    }
+  }
+}
+
+function sysRecruitment(){
+  for(const s of aliveSects()){
+    const living = s.members.map(figById).filter(x=>x&&x.alive);
+    if(living.length<3){
+      for(let i=0;i<ri(1,2);i++){
+        const f=makeFigure({align:s.align,sect:s,art:s.signatureArt,realm:0,age:ri(13,18),talent:ri(15,70)});
+        s.members.push(f.id); STATE.figures.push(f);
+        if(s.signatureArt) s.signatureArt.holders++;
+      }
+    } else if(chance(.35) && living.length<14){
+      const master = pick(living.filter(x=>x.realm>=3)) || pick(living);
+      const f=makeFigure({align:s.align,sect:s,art:s.signatureArt,realm:0,age:ri(12,17),talent:ri(15,75),master:master?master.id:null});
+      s.members.push(f.id); STATE.figures.push(f);
+      if(s.signatureArt) s.signatureArt.holders++;
+      if(f.talent>=68){
+        chron("c-lineage", `A prodigy named ${plainRef(f)} is taken in by ${sref(s)}; the elders whisper of a rare innate root.`, "normal");
+      }
+    }
+  }
+}
+
+function sysArtRefinement(){
+  for(const a of STATE.arts){
+    if(a.lost||a.dormant) continue;
+    const masters = aliveFigs().filter(f=>f.art===a && f.realm>=5);
+    if(masters.length && chance(.12) && a.tier<9){
+      a.tier++;
+      const m=pick(masters);
+      const ord=["","first","second","third","fourth","fifth","sixth","seventh","eighth","ninth"][a.tier];
+      chron("c-art", `${ref(m)} comprehends a higher layer of ${aref(a)}, refining it to its ${ord} stratum.`, a.tier>=7?"major":"normal");
+    }
+  }
+}
+
+function sysRivalryAndWar(){
+  const sects=aliveSects();
+  for(const w of [...STATE.activeWars]){
+    w.years++;
+    const A=STATE.sects.find(s=>s.id===w.a), B=STATE.sects.find(s=>s.id===w.b);
+    if(!A||!B||!A.alive||!B.alive){ endWar(w,A,B); continue; }
+    const pa=sectMight(A), pb=sectMight(B);
+    if(chance(.5)) battle(A,B,pa,pb,w);
+    if(w.years>=2 && (chance(.3)||Math.abs(pa-pb)>pa*0.6)){
+      const winner=pa>=pb?A:B, loser=pa>=pb?B:A;
+      endWar(w,A,B,winner,loser);
+    }
+  }
+  if(sects.length>=2 && STATE.activeWars.length<2 && chance(.22)){
+    const a=pick(sects); let b=pick(sects); let g=0; while(b===a&&g++<5) b=pick(sects);
+    if(a!==b && !warExists(a,b)){
+      const enemyPaths=(a.align==="demonic"&&b.align==="orthodox")||(a.align==="orthodox"&&b.align==="demonic");
+      if(enemyPaths || chance(.4)){
+        const wn=pick(WAR_NAMES);
+        const w={a:a.id,b:b.id,name:wn[0],kr:wn[1],years:0,start:STATE.year};
+        STATE.activeWars.push(w);
+        a.atWarWith.push(b.id); b.atWarWith.push(a.id);
+        const cause = enemyPaths? "the orthodox cannot abide the demonic" :
+          pick(["a stolen manual","an assassinated elder","a contested mountain","an old blood-debt","a marriage betrayed","a duel gone wrong"]);
+        chron("c-war", `${pick(["Banners rise","War drums sound","Blood is sworn"])}: ${sref(a)} and ${sref(b)} fall into open war — ${w.name} (${w.kr}) — over ${cause}.`, "major");
+      }
+    }
+  }
+}
+function sectMight(s){ return s.members.map(figById).filter(x=>x&&x.alive).reduce((t,f)=>t+f.power,0)+s.prestige*5; }
+function warExists(a,b){ return STATE.activeWars.some(w=>(w.a===a.id&&w.b===b.id)||(w.a===b.id&&w.b===a.id)); }
+function topMember(s){ const m=s.members.map(figById).filter(x=>x&&x.alive).sort((a,b)=>b.power-a.power); return m[0]||null; }
+function battle(A,B,pa,pb,w){
+  const winner=pa>=pb?A:B, loser=pa>=pb?B:A;
+  const victims=loser.members.map(figById).filter(x=>x&&x.alive);
+  if(victims.length>1 && chance(.6)){
+    const v=pick(victims.sort((x,y)=>x.power-y.power).slice(0,Math.ceil(victims.length/2)));
+    if(v) killFigure(v, `falls in battle during ${w.name} (${w.kr})`);
+  }
+  const cA=topMember(winner), cB=topMember(loser);
+  if(cA&&cB&&chance(.25)){
+    chron("c-duel", `At the height of ${w.name}, ${ref(cA)} crosses blades with ${ref(cB)} — ${pick(["a clash that splits the very air","three hundred exchanges beneath a bleeding moon","steel and naegong until the river ran red"])}.`, "normal");
+  }
+}
+function endWar(w,A,B,winner,loser){
+  STATE.activeWars=STATE.activeWars.filter(x=>x!==w);
+  if(A) A.atWarWith=A.atWarWith.filter(id=>!B||id!==B.id);
+  if(B) B.atWarWith=B.atWarWith.filter(id=>!A||id!==A.id);
+  if(winner&&loser){
+    winner.prestige += ri(8,18); loser.prestige -= ri(15,30);
+    chron("c-war", `${w.name} (${w.kr}) ends. ${sref(winner)} stands victorious; ${sref(loser)} is broken and humbled.`, "major");
+    if(loser.prestige<=8 || chance(.4)) dissolveSect(loser, `shattered in ${w.name}`);
+  }
+}
+function dissolveSect(s, why){
+  if(!s.alive) return;
+  s.alive=false; s.deadYear=STATE.year;
+  const surv=s.members.map(figById).filter(x=>x&&x.alive);
+  for(const f of surv){ f.sect=null; if(chance(.3)&&f.align==="orthodox") f.align="unorthodox"; }
+  chron("c-fall", `${sref(s)} is ${why}; its disciples scatter into the Gangho, its halls left to the crows.`, "major");
+  if(s.signatureArt && s.signatureArt.holders<=1 && chance(.5)){
+    loseArt(s.signatureArt, `buried in the ruin of ${s.name}`);
+  }
+}
+
+function sysCorruptionAndThreat(){
+  for(const f of aliveFigs()){
+    if(f.align!=="recluse"){
+      let drift=0;
+      if(f.art && f.art.corruption>30) drift += rand()*1.5;
+      if(f.grudges.length) drift += rand()*1.2;
+      if(STATE.activeWars.length) drift += rand()*0.6;
+      if(drift>0) alignShift(f, drift);
+    }
+    if(!STATE.threatActive && f.align==="demonic" && f.realm>=7 && f.alignmentDrift>=85 && chance(.4)){
+      f.isThreat=true; STATE.threatActive=true;
+      maybeName(f);
+      chron("c-threat", `A shadow falls over all under heaven: ${ref(f)} ascends as the <b style="color:var(--blood)">Heavenly Demon (천마)</b> and declares the old order finished. ${f.lineage?`Heir to ${f.lineage}, `:""}the Murim trembles.`, "epic");
+    }
+  }
+  if(STATE.threatActive){
+    const threat = aliveFigs().find(f=>f.isThreat);
+    if(threat && chance(.35)){
+      const heroes = aliveFigs().filter(f=>f.align!=="demonic" && f.realm>=5 && f!==threat);
+      if(heroes.length>=2){
+        const champ = heroes.sort((a,b)=>b.power-a.power)[0];
+        if(champ.power > threat.power*0.85 && chance(.5)){
+          killFigure(threat, `is at last cut down by ${champ.byeolho?cap(champ.byeolho.en):champ.name} and the orthodox alliance (무림맹)`);
+          champ.fame+=20; maybeName(champ);
+          chron("c-rise", `${ref(champ)} is hailed across the Murim as the hero who slew the Heavenly Demon.`, "major");
+        } else {
+          killFigure(champ, `is slain confronting the Heavenly Demon`);
+        }
+      }
+    }
+  }
+}
+
+function sysLostAndFound(){
+  for(const a of STATE.arts){
+    if(!a.lost && !a.dormant && a.holders<=0 && chance(.5)){
+      loseArt(a, "its last practitioner dead, the manual mislaid");
+    }
+  }
+  const lost = STATE.arts.filter(a=>a.lost||a.dormant);
+  if(lost.length && chance(.14)){
+    const a=pick(lost);
+    const arch=pick([
+      {n:"a destitute beggar",t:ri(70,95)},
+      {n:"an orphaned woodcutter",t:ri(65,90)},
+      {n:"a disgraced servant",t:ri(60,88)},
+      {n:"a wandering mute child",t:ri(72,96)},
+      {n:"a condemned prisoner",t:ri(60,85)}
+    ]);
+    const f=makeFigure({align: a.dormant?"demonic":(a.align==="demonic"?"unorthodox":a.align), realm:1, age:ri(15,24), talent:arch.t, art:a});
+    a.lost=false; a.dormant=false; a.holders=1;
+    if(a.lostHolder) f.lineage = a.lostHolder+"'s legacy";
+    STATE.figures.push(f);
+    chron("c-found2", `In ${pick(REGIONS)}, ${arch.n} named ${plainRef(f)} stumbles upon ${aref(a)}, lost ${STATE.year-(a.lostYear||a.origin)} years. Fate chooses strangely.`, "major");
+    if(a.dormant || a.corruption>50){
+      chron("c-corrupt", `The manual is steeped in old malice. Those who hear of it fear what ${plainRef(f)} may become.`, "normal");
+    }
+  }
+}
+function loseArt(a, why){
+  a.lost=true; a.lostYear=STATE.year; a.holders=0;
+  chron("c-lost", `${aref(a)} is lost to time — ${why}.`, "normal");
+}
+
+function sysSectFortune(){
+  for(const s of aliveSects()){
+    s.prestige = clamp(s.prestige + (rand()-0.45)*4, 0, 100);
+    if(s.prestige<=4 && chance(.5)) dissolveSect(s, "withered into obscurity, its halls left empty");
+  }
+  if(aliveSects().length<7 && chance(.16)){
+    const wanderers = aliveFigs().filter(f=>!f.sect && f.realm>=5);
+    if(wanderers.length){
+      const founder=pick(wanderers);
+      const s=makeSect({align:founder.align, prestige:ri(30,50)});
+      s.signatureArt = founder.art || pick(STATE.arts.filter(a=>!a.lost)) || null;
+      founder.sect=s; s.members.push(founder.id);
+      STATE.sects.push(s);
+      maybeName(founder, true);
+      chron("c-found", `From the ashes, ${ref(founder)} establishes ${sref(s)} in ${s.region}. A new power rises where the old fell.`, "major");
+    }
+  }
+}
+
+function sysHeroicArcs(){
+  if(chance(.18)){
+    const figs=aliveFigs().filter(f=>f.realm>=3);
+    if(figs.length>=2){
+      const a=pick(figs); let b=pick(figs); let g=0; while(b===a&&g++<4) b=pick(figs);
+      if(a!==b){
+        const ev=pick([
+          ()=>`${ref(a)} and ${ref(b)} swear brotherhood beneath the peach blossoms, vowing to share fortune and ruin alike.`,
+          ()=>`A bitter duel: ${ref(a)} defeats ${ref(b)} atop ${pick(["Sword-Testing Cliff","the Frozen Pavilion","Lone Goose Peak","the Drunken Bridge"])}, sparing their life — and earning a lifelong grudge.`,
+          ()=>{ a.grudges.push(b.id); return `${ref(b)} betrays ${ref(a)}, stealing a page of their manual under the new moon.`; },
+          ()=>`${ref(a)} takes ${ref(b)} as a sworn disciple, passing down hard-won insight.`,
+          ()=>`Rumour spreads that ${ref(a)} has fallen in love with ${ref(b)} — a romance the sects forbid.`
+        ]);
+        chron(pick(["c-duel","c-lineage","c-peace"]), ev(), "normal");
+      }
+    }
+  }
+}
+
+/* =====================================================================
+   RENDER (runner)
+   ===================================================================== */
+const $=id=>document.getElementById(id);
+let autoScroll=true;
+
+function renderLog(){
+  if(!STATE.dirtyLog) return;
+  STATE.dirtyLog=false;
+  const box=$("chron");
+  const atBottom = box.scrollHeight-box.scrollTop-box.clientHeight < 80;
+  const frag=document.createDocumentFragment();
+  box.innerHTML="";
+  const entries=STATE.log.slice(-260);
+  let lastYear=null;
+  for(const e of entries){
+    if(e.year!==lastYear){
+      lastYear=e.year;
+      const ym=document.createElement("div");
+      ym.className="yearmark";
+      ym.innerHTML=`<span class="y">Year ${e.year}</span><span class="ystat">${aliveSects().length} sects · ${aliveFigs().length} martial artists${STATE.threatActive?` · <span style="color:var(--blood)">a Heavenly Demon walks</span>`:""}</span>`;
+      frag.appendChild(ym);
+    }
+    const d=document.createElement("div");
+    d.className=`entry ${e.cls} ${e.level==="major"?"major":""} ${e.level==="epic"?"epic major":""}`;
+    d.innerHTML=`<span class="txt"><span class="tag">${STATE.seasonNames[e.season]}</span>${e.html}</span>`;
+    frag.appendChild(d);
+  }
+  box.appendChild(frag);
+  if(autoScroll && atBottom) box.scrollTop=box.scrollHeight;
+}
+
+function bar(v,max,color){ return `<div class="mini"><i style="width:${clamp(v/max*100,0,100)}%;background:${color}"></i></div>`; }
+
+function renderPanels(){
+  if(!STATE.dirtyPanels) return;
+  STATE.dirtyPanels=false;
+
+  $("yr").textContent=STATE.year;
+  $("season").textContent=STATE.seasonNames[STATE.season];
+  $("alive").textContent=aliveFigs().length;
+
+  $("s-fig").textContent=aliveFigs().length;
+  $("s-war").textContent=STATE.activeWars.length;
+  $("s-art").textContent=STATE.arts.filter(a=>!a.lost&&!a.dormant).length;
+  $("s-lost").textContent=STATE.arts.filter(a=>a.lost||a.dormant).length;
+
+  const sl=$("sectlist");
+  const sects=[...STATE.sects].sort((a,b)=>(b.alive-a.alive)||(sectMight(b)-sectMight(a)));
+  $("sectct").textContent=aliveSects().length;
+  sl.innerHTML="";
+  for(const s of sects.slice(0,16)){
+    const al=ALIGN[s.align];
+    const living=s.members.map(figById).filter(x=>x&&x.alive);
+    const lead=topMember(s);
+    const div=document.createElement("div");
+    div.className="sect"+(s.alive?"":" dead");
+    div.style.setProperty("--c",al.c);
+    const leadName = lead? (lead.byeolho&&lead.namedAt!=null? cap(lead.byeolho.en):lead.name):"";
+    div.innerHTML=`
+      <div class="sect-head">
+        <div class="sect-name">${s.kr}<span class="en">${s.name}</span></div>
+        <div class="sect-tier">${al.kr}</div>
+      </div>
+      <div class="sect-meta">
+        <span><b>${living.length}</b> disciples</span>
+        <span>${s.region.replace("the ","").replace(/\s*\(.*\)/,"")}</span>
+      </div>
+      ${lead?`<div class="sect-meta"><span>Head: <b>${leadName}</b> · ${REALM_KR[lead.realm]}</span></div>`:""}
+      <div class="pbar"><i style="width:${clamp(s.prestige,0,100)}%"></i></div>
+    `;
+    sl.appendChild(div);
+  }
+
+  const fl=$("figlist");
+  const figs=aliveFigs().sort((a,b)=>(b.isThreat-a.isThreat)||(b.power-a.power)).slice(0,12);
+  $("figct").textContent=aliveFigs().length;
+  fl.innerHTML="";
+  for(const f of figs){
+    const al=ALIGN[f.align];
+    const div=document.createElement("div");
+    div.className="figcard";
+    div.style.setProperty("--c",al.c);
+    const named=f.byeolho&&f.namedAt!=null;
+    div.innerHTML=`
+      <div class="fig-name">${named?`<span class="fig-alias">${cap(f.byeolho.en)} · ${f.byeolho.kr}</span>`:f.name}</div>
+      <div class="fig-sub">${named?f.name+" · ":""}${al.label}${f.isThreat?` · <span style="color:var(--blood)">천마 HEAVENLY DEMON</span>`:""}${f.sect?" · "+f.sect.name:" · wanderer"}</div>
+      <span class="fig-realm">${REALMS[f.realm]} · ${REALM_KR[f.realm]}</span>
+      <div class="fig-bars">
+        <span>내공</span>${bar(f.power,1100,al.c)}
+        <span>명성</span>${bar(f.fame,60,"var(--gold)")}
+        <span>마기</span>${bar(f.alignmentDrift,100,"var(--magyo)")}
+      </div>
+      ${f.art?`<div class="fig-sub" style="margin-top:6px">${f.art.name} (${f.art.kr}) · tier ${f.art.tier}</div>`:""}
+    `;
+    fl.appendChild(div);
+  }
+}
+
+/* =====================================================================
+   LOOP & CONTROLS
+   ===================================================================== */
+let timer=null, speed=420, paused=false;
+function loop(){
+  if(!paused){ tick(); renderLog(); renderPanels(); }
+  timer=setTimeout(loop, speed);
+}
+function start(seed){
+  if(timer) clearTimeout(timer);
+  genesis(seed);
+  renderLog(); renderPanels();
+  loop();
+}
+
+$("pause").addEventListener("click",e=>{
+  paused=!paused;
+  e.target.textContent=paused?"▶ Resume":"❚❚ Pause";
+});
+$("reseed").addEventListener("click",()=>start((Math.random()*0xffffffff)>>>0));
+$("speed").addEventListener("click",e=>{
+  if(e.target.dataset.s){
+    speed=+e.target.dataset.s;
+    [...$("speed").children].forEach(b=>b.classList.toggle("on",b===e.target));
+  }
+});
+$("chron").addEventListener("scroll",e=>{
+  const box=e.target;
+  autoScroll = box.scrollHeight-box.scrollTop-box.clientHeight < 120;
+  $("fnote").textContent = autoScroll? "The brush records all. Scroll up to read the past." : "Reading the past — scroll to the bottom to follow the present.";
+});
+
+start((Math.random()*0xffffffff)>>>0);
+</script>
+</body>
+</html>
