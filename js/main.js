@@ -5,7 +5,10 @@ import { setFollow, clearFollow } from './follow.js';
 import { buildChainView } from './chain.js';
 import { buildTreeView } from './tree.js';
 import { loc } from './i18n.js';
-import { STATE } from './state.js';
+import { STATE, figById } from './state.js';
+import { REALMS, REALM_KR } from './data.js';
+import { cap } from './rng.js';
+import { livePlayer, endPlayer, playerFig, maybeDecision, applyChoice, playerSummary, PLAYER } from './play.js';
 
 const $ = id => document.getElementById(id);
 
@@ -29,18 +32,99 @@ function openTree(figId) {
 function closeTree() { $("tree-overlay").style.display = 'none'; }
 
 let timer = null, speed = 420, paused = false;
+let pendingDecision = null;   // set while a player choice is on screen — the world holds its breath
+let lifeSummaryShown = false; // set while the end-of-life reckoning is up
 
 function loop() {
-  if (!paused) { tick(); renderLog(); renderPanels(); }
+  if (!paused && !pendingDecision && !lifeSummaryShown) {
+    tick();
+    if (PLAYER.active) {
+      const f = playerFig();
+      if (!f || !f.alive) { showSummary(); }    // life ended — freezes via lifeSummaryShown
+      else if (STATE.season === 0) {            // a year has turned — fate may knock
+        const d = maybeDecision();
+        if (d) presentDecision(d);
+      }
+    }
+    renderLog(); renderPanels(); updateHud();
+  }
   timer = setTimeout(loop, speed);
 }
 
 function start(seed) {
   if (timer) clearTimeout(timer);
-  clearFollow();
+  clearFollow(); endPlayer(); pendingDecision = null;
+  $("play-overlay").style.display = 'none';
   genesis(seed);
-  renderLog(); renderPanels();
+  renderLog(); renderPanels(); updateHud();
   loop();
+}
+
+/* ---- living a life ---- */
+function startLife() {
+  if (PLAYER.active && playerFig() && playerFig().alive) return;   // already living
+  $("play-overlay").style.display = 'none';
+  pendingDecision = null; lifeSummaryShown = false;
+  const f = livePlayer();
+  setFollow('fig', f.id);
+  renderLog(); renderPanels(); updateHud();
+}
+
+function updateHud() {
+  const hud = $("player-hud");
+  const f = playerFig();
+  if (!PLAYER.active || !f) { hud.style.display = 'none'; return; }
+  hud.style.display = 'flex';
+  const name = f.byeolho && f.namedAt != null ? cap(f.byeolho.en) : f.name;
+  const realm = STATE.showHangul ? `${REALMS[f.realm]} (${REALM_KR[f.realm]})` : REALMS[f.realm];
+  const goal = PLAYER.goal ? PLAYER.goal.text : "—";
+  hud.innerHTML = loc(
+    `<span class="ph-tag">YOU</span>` +
+    `<span class="ph-name">${name}</span>` +
+    `<span class="ph-stat">${realm} · Age ${f.age}${f.alive ? '' : ' · 卒'}</span>` +
+    `<span class="ph-goal">Ambition: ${goal}</span>`
+  );
+}
+
+/* ---- decision modal ---- */
+function presentDecision(d) {
+  pendingDecision = d;
+  const opts = d.options.map((o, i) =>
+    `<button class="play-opt" data-idx="${i}"><span class="po-label">${o.label}</span><span class="po-desc">${o.desc}</span></button>`
+  ).join('');
+  $("play-body").innerHTML = loc(
+    `<div class="play-kind">A Crossroads</div>` +
+    `<div class="play-title">${d.title}</div>` +
+    `<div class="play-text">${d.text}</div>` +
+    `<div class="play-opts">${opts}</div>`
+  );
+  $("play-overlay").style.display = 'flex';
+}
+function resolveDecision(idx) {
+  if (!pendingDecision) return;
+  applyChoice(pendingDecision, idx);
+  pendingDecision = null;
+  $("play-overlay").style.display = 'none';
+  renderLog(); renderPanels(); updateHud();
+  const f = playerFig();
+  if (PLAYER.active && (!f || !f.alive)) showSummary();
+}
+
+/* ---- life summary ---- */
+function showSummary() {
+  lifeSummaryShown = true;
+  const s = playerSummary();
+  $("play-body").innerHTML = loc(
+    `<div class="play-kind">A Life Concluded</div>` +
+    `<div class="play-title" style="color:${s.alignColor}">${s.name}</div>` +
+    `<div class="play-summary">${s.lines.map(l => `<div>${l}</div>`).join('')}</div>` +
+    `<div class="play-score">Legend Score <b>${s.score}</b></div>` +
+    `<div class="play-opts">` +
+      `<button class="play-opt" data-life="again"><span class="po-label">Live Another Life</span><span class="po-desc">Be born anew into this same age.</span></button>` +
+      `<button class="play-opt" data-life="watch"><span class="po-label">Return to Watching</span><span class="po-desc">Let the chronicle run on without you.</span></button>` +
+    `</div>`
+  );
+  $("play-overlay").style.display = 'flex';
 }
 
 /* ---- playback controls ---- */
@@ -49,13 +133,34 @@ $("pause").addEventListener("click", e => {
   e.target.textContent = paused ? "▶ Resume" : "❚❚ Pause";
 });
 $("reseed").addEventListener("click", () => start((Math.random() * 0xffffffff) >>> 0));
+$("live").addEventListener("click", startLife);
+
+/* ---- player decision / summary modal ---- */
+$("play-body").addEventListener("click", e => {
+  const opt = e.target.closest(".play-opt");
+  if (!opt) return;
+  if (opt.dataset.life === "again") {
+    lifeSummaryShown = false; endPlayer();
+    $("play-overlay").style.display = 'none';
+    startLife();
+    return;
+  }
+  if (opt.dataset.life === "watch") {
+    lifeSummaryShown = false; endPlayer();
+    $("play-overlay").style.display = 'none';
+    renderLog(); renderPanels(); updateHud();
+    return;
+  }
+  if (opt.dataset.idx != null) resolveDecision(+opt.dataset.idx);
+});
+
 $("hangul").addEventListener("click", e => {
   STATE.showHangul = !STATE.showHangul;
   e.target.classList.toggle("on", STATE.showHangul);
   e.target.textContent = STATE.showHangul ? "한 Hangul: On" : "한 Hangul: Off";
   document.body.classList.toggle("no-hangul", !STATE.showHangul);
   STATE.dirtyLog = true; STATE.dirtyPanels = true;
-  renderLog(); renderPanels();
+  renderLog(); renderPanels(); updateHud();
   /* refresh whichever reader overlay is open so it re-localises too */
   if ($("chain-overlay").style.display === 'flex' && lastChainId != null) openChain(lastChainId);
   if ($("tree-overlay").style.display === 'flex' && lastTreeId != null) openTree(lastTreeId);
