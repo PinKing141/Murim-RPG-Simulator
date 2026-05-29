@@ -297,6 +297,100 @@ button.ctl.primary:hover { box-shadow: 0 0 16px rgba(201,162,39,.25); }
 }
 .obit-empty { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: var(--ink-faint); font-style: italic; }
 
+/* ---- "Why?" trace buttons ---- */
+.why-btn {
+  font-family: 'Cinzel', serif; font-size: 10px; letter-spacing: .05em;
+  background: linear-gradient(180deg, #221f15, #19170f);
+  border: 1px solid #4a3f1e; border-radius: 3px;
+  color: var(--gold); padding: 5px 10px; cursor: pointer; transition: .15s;
+  margin: 8px 6px 4px 0;
+}
+.why-btn:hover { border-color: var(--gold); color: var(--gold-bright); box-shadow: 0 0 12px rgba(201,162,39,.2); }
+.dos-traces { display: flex; flex-wrap: wrap; margin-top: 4px; }
+
+/* ---- Chronicle entry: chain affordance ---- */
+.entry { cursor: pointer; }
+.entry .chain-mark {
+  font-size: 11px; margin-left: 7px; color: var(--dot);
+  opacity: 0; transition: opacity .15s; vertical-align: middle;
+}
+.entry.has-chain:hover .chain-mark { opacity: .85; }
+.entry.has-chain:hover { background: linear-gradient(90deg, rgba(201,162,39,.05), transparent 60%); }
+
+/* ---- Chain reader (modal) ---- */
+.chain-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(8, 7, 5, .78); backdrop-filter: blur(2px);
+  padding: 40px 20px;
+}
+.chain-modal {
+  width: min(760px, 100%); max-height: 86vh; display: flex; flex-direction: column;
+  background:
+    radial-gradient(900px 500px at 50% -10%, #1c1a13 0%, transparent 60%),
+    var(--paper-2);
+  border: 1px solid #4a3f1e; border-radius: 6px;
+  box-shadow: 0 24px 70px rgba(0,0,0,.6);
+}
+.chain-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; border-bottom: 1px solid var(--line); flex-shrink: 0;
+}
+.chain-title {
+  font-family: 'Cinzel', serif; font-size: 15px; font-weight: 600;
+  letter-spacing: .06em; color: var(--gold-bright);
+}
+.chain-title-kr { font-family: 'Noto Serif KR', serif; font-size: 12px; color: var(--ink-dim); margin-left: 8px; letter-spacing: .12em; }
+.chain-close {
+  background: none; border: 1px solid var(--line); border-radius: 3px;
+  color: var(--ink-dim); font-size: 18px; line-height: 1; width: 30px; height: 30px;
+  cursor: pointer; transition: .15s;
+}
+.chain-close:hover { border-color: var(--gold); color: var(--gold-bright); }
+.chain-body { overflow-y: auto; padding: 18px 22px 26px; }
+
+.chain-sec {
+  font-family: 'Cinzel', serif; font-size: 9.5px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--ink-faint);
+  margin: 4px 0 8px;
+}
+.chain-sec-focus { color: var(--gold); }
+
+.chain-row {
+  position: relative; display: flex; gap: 12px; align-items: baseline;
+  padding: 9px 13px; border: 1px solid var(--line); border-radius: 4px;
+  background: var(--paper); cursor: pointer; transition: .15s;
+  border-left: 3px solid var(--dot, var(--ink-faint));
+}
+.chain-row:hover { border-color: #534a30; border-left-color: var(--dot, var(--ink-faint)); transform: translateX(2px); }
+.chain-focus {
+  cursor: default; background: linear-gradient(90deg, rgba(201,162,39,.1), transparent 70%);
+  border-color: var(--gold); border-left-color: var(--gold);
+}
+.chain-focus:hover { transform: none; }
+.chain-when {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--gold);
+  min-width: 64px; flex-shrink: 0; white-space: nowrap;
+}
+.chain-season { color: var(--ink-faint); }
+.chain-text { font-family: 'Cormorant Garamond', serif; font-size: 15px; line-height: 1.4; color: var(--ink); }
+.chain-text .nm { color: var(--gold-bright); font-weight: 600; font-style: italic; }
+.chain-text .sn { color: var(--azure); font-weight: 500; }
+.chain-text em.art { color: var(--violet); font-style: italic; }
+
+.chain-link { text-align: center; color: var(--ink-faint); font-size: 13px; line-height: 1; padding: 4px 0; }
+
+/* inherit dot colors for chain rows */
+.chain-row.c-found  { --dot: var(--jade); }        .chain-row.c-break  { --dot: var(--gold-bright); }
+.chain-row.c-war    { --dot: var(--blood); }       .chain-row.c-death  { --dot: var(--ink-faint); }
+.chain-row.c-art    { --dot: var(--violet); }      .chain-row.c-fall   { --dot: #7a3030; }
+.chain-row.c-rise   { --dot: var(--gold-bright); } .chain-row.c-corrupt{ --dot: var(--magyo); }
+.chain-row.c-duel   { --dot: var(--azure); }       .chain-row.c-lost   { --dot: var(--eunja); }
+.chain-row.c-found2 { --dot: var(--jade); }        .chain-row.c-threat { --dot: #d14b3a; }
+.chain-row.c-peace  { --dot: var(--jade); }        .chain-row.c-lineage{ --dot: var(--sapa); }
+
+.chain-empty { font-family: 'Cormorant Garamond', serif; font-style: italic; color: var(--ink-dim); text-align: center; padding: 16px; }
+
 @media (max-width: 1100px) {
   .app { grid-template-columns: 1fr; }
   .panel.left, .panel.right { display: none; }

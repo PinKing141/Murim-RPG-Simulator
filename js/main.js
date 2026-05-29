@@ -2,8 +2,16 @@ import { tick } from './systems.js';
 import { genesis } from './genesis.js';
 import { renderLog, renderPanels, setAutoScroll } from './render.js';
 import { setFollow, clearFollow } from './follow.js';
+import { buildChainView } from './chain.js';
 
 const $ = id => document.getElementById(id);
+
+/* ---- chain reader ---- */
+function openChain(eid) {
+  $("chain-body").innerHTML = buildChainView(+eid);
+  $("chain-overlay").style.display = 'flex';
+}
+function closeChain() { $("chain-overlay").style.display = 'none'; }
 
 let timer = null, speed = 420, paused = false;
 
@@ -65,12 +73,33 @@ $("figlist").addEventListener("click", e => {
   }
 });
 
-/* ---- follow: links inside dossier ---- */
+/* ---- follow + chain: links inside dossier ---- */
 $("dossier-wrap").addEventListener("click", e => {
+  const chainBtn = e.target.closest("[data-chain]");
+  if (chainBtn) { openChain(chainBtn.dataset.chain); return; }
   const ff = e.target.closest("[data-follow-fig]");
   if (ff) { setFollow('fig', +ff.dataset.followFig); renderLog(); renderPanels(); return; }
   const fs = e.target.closest("[data-follow-sect]");
   if (fs) { setFollow('sect', +fs.dataset.followSect); renderLog(); renderPanels(); }
+});
+
+/* ---- chain: click an event in the chronicle ---- */
+$("chron").addEventListener("click", e => {
+  const entry = e.target.closest(".entry[data-eid]");
+  if (entry) openChain(entry.dataset.eid);
+});
+
+/* ---- chain: navigate within the chain, and close ---- */
+$("chain-body").addEventListener("click", e => {
+  const row = e.target.closest("[data-eid]");
+  if (row) openChain(row.dataset.eid);
+});
+$("chain-close").addEventListener("click", closeChain);
+$("chain-overlay").addEventListener("click", e => {
+  if (e.target === $("chain-overlay")) closeChain();
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") closeChain();
 });
 
 start((Math.random() * 0xffffffff) >>> 0);

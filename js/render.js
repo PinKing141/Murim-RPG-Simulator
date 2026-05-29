@@ -62,9 +62,11 @@ export function renderLog() {
       ym.innerHTML = `<span class="y">Year ${e.year}</span><span class="ystat">${aliveSects().length} sects · ${aliveFigs().length} martial artists${STATE.threatActive ? ` · <span style="color:var(--blood)">a Heavenly Demon walks</span>` : ""}</span>`;
       frag.appendChild(ym);
     }
+    const hasChain = (e.causes && e.causes.length) || (e.effects && e.effects.length);
     const d = document.createElement("div");
-    d.className = `entry ${e.cls} ${e.level === "major" ? "major" : ""} ${e.level === "epic" ? "epic major" : ""}`;
-    d.innerHTML = `<span class="txt"><span class="tag">${STATE.seasonNames[e.season]}</span>${e.html}</span>`;
+    d.className = `entry ${e.cls} ${e.level === "major" ? "major" : ""} ${e.level === "epic" ? "epic major" : ""}${hasChain ? " has-chain" : ""}`;
+    d.dataset.eid = e.id;
+    d.innerHTML = `<span class="txt"><span class="tag">${STATE.seasonNames[e.season]}</span>${e.html}${hasChain ? `<span class="chain-mark" title="Trace cause &amp; consequence">⛓</span>` : ""}</span>`;
     frag.appendChild(d);
   }
   box.appendChild(frag);

@@ -62,6 +62,13 @@ export function buildFigDossier(f) {
   h += ` · Talent ${f.talent}`;
   h += `</div>`;
 
+  // causal "why?" traces for the figure's defining turns
+  const traces = [];
+  if (f.ascendEvent != null) traces.push(`<button class="why-btn" data-chain="${f.ascendEvent}">⛓ Why the Heavenly Demon?</button>`);
+  if (f.originEvent != null) traces.push(`<button class="why-btn" data-chain="${f.originEvent}">⛓ How they found their art</button>`);
+  else if (f.fallEvent != null) traces.push(`<button class="why-btn" data-chain="${f.fallEvent}">⛓ Why they fell</button>`);
+  if (traces.length) h += `<div class="dos-traces">${traces.join('')}</div>`;
+
   // cultivation timeline
   h += `<div class="dos-sec">Cultivation Path</div>`;
   h += `<div class="dos-timeline">`;
@@ -138,6 +145,10 @@ export function buildSectDossier(s) {
   h += `</div>`;
   h += `<div class="dos-meta">Founded Year ${s.founded}${!s.alive && s.deadYear ? ` · Dissolved Year ${s.deadYear}` : ''} · ${s.region}</div>`;
   h += `<div class="dos-meta">Prestige ${Math.round(s.prestige)} · ${living.length} living disciples · ${s.allMembers.length} total</div>`;
+
+  if (!s.alive && s.fallEvent != null) {
+    h += `<button class="why-btn" data-chain="${s.fallEvent}">⛓ Why did this house fall?</button>`;
+  }
 
   if (s.signatureArt) {
     h += `<div class="dos-conn" style="margin-top:8px"><span class="dos-role">Art</span><em class="art">${s.signatureArt.name} (${s.signatureArt.kr})</em></div>`;

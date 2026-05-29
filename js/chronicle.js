@@ -1,5 +1,5 @@
 import { cap } from './rng.js';
-import { STATE } from './state.js';
+import { STATE, newEvId } from './state.js';
 
 export function ref(f) {
   if (!f) return "an unknown";
@@ -11,7 +11,28 @@ export function plainRef(f) { return `<span class="nm">${f.name}</span>`; }
 export function sref(s)  { return s ? `<span class="sn">${s.name} (${s.kr})</span>` : "a vanished house"; }
 export function aref(a)  { return a ? `<em class="art">${a.name} (${a.kr})</em>` : "a forgotten art"; }
 
-export function chron(cls, html, level, figs = [], sects = []) {
-  STATE.log.push({ year: STATE.year, season: STATE.season, cls, html, level: level || "normal", figs, sects });
+/* Look up an event node by its id. */
+export const evById = id => STATE.eventIndex.get(id);
+
+/*
+  Record a chronicle entry as an event node.
+  causes is an array of prior event ids that directly led to this one;
+  each cause gets a back-edge into its effects[] so the graph is walkable
+  both ways. Returns the new event so callers can wire downstream edges.
+*/
+export function chron(cls, html, level, figs = [], sects = [], causes = []) {
+  const validCauses = causes.filter(id => id != null && STATE.eventIndex.has(id));
+  const ev = {
+    id: newEvId(),
+    year: STATE.year, season: STATE.season,
+    cls, html, level: level || "normal",
+    figs, sects,
+    causes: validCauses,
+    effects: []
+  };
+  STATE.log.push(ev);
+  STATE.eventIndex.set(ev.id, ev);
+  for (const cid of validCauses) STATE.eventIndex.get(cid).effects.push(ev.id);
   STATE.dirtyLog = true;
+  return ev;
 }

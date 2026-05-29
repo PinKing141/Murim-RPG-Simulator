@@ -11,10 +11,11 @@ function addToSect(s, f) {
 export function genesis(seed) {
   RNG.fn = makeRNG(seed >>> 0);
   Object.assign(STATE, {
-    idc: 1, year: 1, season: 0,
+    idc: 1, evc: 1, year: 1, season: 0,
     seasonNames: ["Spring","Summer","Autumn","Winter"],
     figures: [], sects: [], arts: [],
-    log: [], dirtyLog: true, dirtyPanels: true,
+    log: [], eventIndex: new Map(),
+    dirtyLog: true, dirtyPanels: true,
     activeWars: [], threatActive: false, seed
   });
 

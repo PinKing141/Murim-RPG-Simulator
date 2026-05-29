@@ -6,14 +6,16 @@ import {
 } from './data.js';
 
 export const STATE = {
-  idc: 1, year: 1, season: 0,
+  idc: 1, evc: 1, year: 1, season: 0,
   seasonNames: ["Spring","Summer","Autumn","Winter"],
   figures: [], sects: [], arts: [],
-  log: [], dirtyLog: true, dirtyPanels: true,
+  log: [], eventIndex: new Map(),
+  dirtyLog: true, dirtyPanels: true,
   activeWars: [], threatActive: false, seed: 0
 };
 
-export function newId() { return STATE.idc++; }
+export function newId()    { return STATE.idc++; }
+export function newEvId()  { return STATE.evc++; }
 
 export function makeName() {
   if (chance(.22)) return pick(CLAN_SURNAMES) + " " + pick(GIVEN);
@@ -48,7 +50,8 @@ export function makeArt(align) {
     corruption: align === "demonic" ? ri(35,70) : align === "unorthodox" ? ri(15,40) : ri(0,12),
     lost: false, dormant: false,
     holders: 0, origin: STATE.year, lostYear: null,
-    lostHolder: null, lostHolderId: null
+    lostHolder: null, lostHolderId: null,
+    lostEvent: null
   };
 }
 
@@ -86,7 +89,9 @@ export function makeFigure(opts = {}) {
     alive: true, born: STATE.year,
     isThreat: false, namedAt: null,
     grudges: [], brothers: [],
-    realmHistory: [], lineageId: null
+    realmHistory: [], lineageId: null,
+    grudgeCause: {},
+    originEvent: null, fallEvent: null, ascendEvent: null
   };
   recomputeLife(f);
   recomputePower(f);
@@ -106,6 +111,7 @@ export function makeSect(opts = {}) {
     members: [], allMembers: [],
     signatureArt: null,
     alive: true, deadYear: null,
+    fallEvent: null,
     atWarWith: []
   };
 }
