@@ -1,0 +1,316 @@
+import { rand, ri, pick, chance, clamp, cap } from './rng.js';
+import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN } from './data.js';
+import { STATE, aliveFigs, aliveSects, figById, makeFigure, makeSect, recomputeLife, recomputePower, makeByeolho } from './state.js';
+import { chron, ref, plainRef, sref, aref } from './chronicle.js';
+
+export function maybeName(f, force) {
+  if (f.namedAt != null) return;
+  if (force || (f.realm >= 3 && f.fame >= 14)) {
+    f.byeolho = makeByeolho();
+    f.namedAt = STATE.year;
+    chron("c-rise", `${plainRef(f)}${f.sect ? " of " + f.sect.name + " (" + f.sect.kr + ")" : ""} has won renown across the land, now spoken of as <span class="nm">${cap(f.byeolho.en)} (${f.byeolho.kr})</span>.`, "major");
+  }
+}
+
+export function alignShift(f, amount, reason) {
+  const before = f.align;
+  f.alignmentDrift = clamp(f.alignmentDrift + amount, 0, 100);
+  let na;
+  if (f.alignmentDrift >= 72) na = "demonic";
+  else if (f.alignmentDrift >= 42) na = "unorthodox";
+  else if (f.alignmentDrift <= 10 && f.align !== "recluse") na = "orthodox";
+  else na = f.align;
+  if (na !== before && f.align !== "recluse") {
+    f.align = na;
+    if (na === "demonic") {
+      chron("c-corrupt", `${ref(f)} has fallen to the Demonic Path (마도)${reason ? " — " + reason : ""}. The energy about them turns cold and ravenous.`, "major");
+    } else if (na === "unorthodox" && before === "orthodox") {
+      chron("c-corrupt", `${ref(f)} forsakes the orthodox canon for unorthodox methods${reason ? " after " + reason : ""}.`, "normal");
+    }
+    recomputeLife(f);
+  }
+}
+
+export function killFigure(f, why) {
+  f.alive = false; f.diedYear = STATE.year;
+  if (f.sect) { f.sect.members = f.sect.members.filter(id => id !== f.id); }
+  if (f.art) f.art.holders = Math.max(0, f.art.holders - 1);
+  if (f.namedAt != null || f.realm >= 4) {
+    const lvl = f.realm >= 6 ? "major" : "normal";
+    chron("c-death", `${ref(f)}${f.sect ? " of " + f.sect.name : ""} ${why}. ${f.realm >= 6 ? "An age ends with them." : ""}`, lvl);
+    if (f.isThreat) {
+      STATE.threatActive = false;
+      chron("c-peace", `With the fall of the Heavenly Demon, the Murim exhales. Yet ${aref(f.art)} was never recovered...`, "major");
+      if (f.art) { f.art.dormant = true; f.art.lostHolder = f.name; }
+    }
+  }
+}
+
+export function loseArt(a, why) {
+  a.lost = true; a.lostYear = STATE.year; a.holders = 0;
+  chron("c-lost", `${aref(a)} is lost to time — ${why}.`, "normal");
+}
+
+export function dissolveSect(s, why) {
+  if (!s.alive) return;
+  s.alive = false; s.deadYear = STATE.year;
+  const surv = s.members.map(figById).filter(x => x && x.alive);
+  for (const f of surv) { f.sect = null; if (chance(.3) && f.align === "orthodox") f.align = "unorthodox"; }
+  chron("c-fall", `${sref(s)} is ${why}; its disciples scatter into the Gangho, its halls left to the crows.`, "major");
+  if (s.signatureArt && s.signatureArt.holders <= 1 && chance(.5)) {
+    loseArt(s.signatureArt, `buried in the ruin of ${s.name}`);
+  }
+}
+
+export function sectMight(s) { return s.members.map(figById).filter(x => x && x.alive).reduce((t, f) => t + f.power, 0) + s.prestige * 5; }
+export function topMember(s) { const m = s.members.map(figById).filter(x => x && x.alive).sort((a, b) => b.power - a.power); return m[0] || null; }
+function warExists(a, b) { return STATE.activeWars.some(w => (w.a === a.id && w.b === b.id) || (w.a === b.id && w.b === a.id)); }
+
+function battle(A, B, pa, pb, w) {
+  const winner = pa >= pb ? A : B, loser = pa >= pb ? B : A;
+  const victims = loser.members.map(figById).filter(x => x && x.alive);
+  if (victims.length > 1 && chance(.6)) {
+    const v = pick(victims.sort((x, y) => x.power - y.power).slice(0, Math.ceil(victims.length / 2)));
+    if (v) killFigure(v, `falls in battle during ${w.name} (${w.kr})`);
+  }
+  const cA = topMember(winner), cB = topMember(loser);
+  if (cA && cB && chance(.25)) {
+    chron("c-duel", `At the height of ${w.name}, ${ref(cA)} crosses blades with ${ref(cB)} — ${pick(["a clash that splits the very air","three hundred exchanges beneath a bleeding moon","steel and naegong until the river ran red"])}.`, "normal");
+  }
+}
+
+function endWar(w, A, B, winner, loser) {
+  STATE.activeWars = STATE.activeWars.filter(x => x !== w);
+  if (A) A.atWarWith = A.atWarWith.filter(id => !B || id !== B.id);
+  if (B) B.atWarWith = B.atWarWith.filter(id => !A || id !== A.id);
+  if (winner && loser) {
+    winner.prestige += ri(8, 18); loser.prestige -= ri(15, 30);
+    chron("c-war", `${w.name} (${w.kr}) ends. ${sref(winner)} stands victorious; ${sref(loser)} is broken and humbled.`, "major");
+    if (loser.prestige <= 8 || chance(.4)) dissolveSect(loser, `shattered in ${w.name}`);
+  }
+}
+
+/* ---- tick systems ---- */
+
+export function sysCultivation() {
+  for (const f of aliveFigs()) {
+    if (f.realm >= APEX) { f.progress = 100; continue; }
+    let gain = (f.talent / 30) + rand() * 4;
+    if (f.align === "demonic") gain *= 1.25;
+    if (f.align === "recluse") gain *= 0.8;
+    if (f.sect) gain *= 1.1;
+    f.progress += gain;
+    if (f.progress >= 100) {
+      f.progress = 0; f.realm++;
+      recomputeLife(f); recomputePower(f);
+      f.fame += 3 + f.realm;
+      const fl = PATH_FLAVOR[f.align];
+      if (f.realm >= 3) {
+        const lvl = f.realm >= 6 ? "major" : "normal";
+        chron("c-break", `${ref(f)} ${fl.verb} the realm of <b style="color:var(--gold)">${REALMS[f.realm]} (${REALM_KR[f.realm]})</b>, ${pick(fl.via)}.`, lvl);
+      }
+      maybeName(f);
+      if (f.realm === APEX) {
+        chron("c-break", `Heaven itself takes notice: ${ref(f)} has touched the <b style="color:var(--gold-bright)">Nature Realm (자연경)</b>, the apex no mortal is meant to reach.`, "epic");
+      }
+    }
+  }
+}
+
+export function sysFame() {
+  for (const f of aliveFigs()) {
+    if (chance(.04)) { f.fame += rand() * 2; maybeName(f); }
+  }
+}
+
+export function sysAging() {
+  for (const f of aliveFigs()) {
+    f.age++;
+    const over = f.age - f.lifespan;
+    let deathP = over > 0 ? 0.18 + over * 0.05 : (f.age > f.lifespan - 10 ? 0.02 : 0.004);
+    if (f.align === "demonic") deathP += 0.01;
+    if (chance(deathP)) killFigure(f, "passes from the world, their naegong returning to heaven and earth");
+  }
+}
+
+export function sysRecruitment() {
+  for (const s of aliveSects()) {
+    const living = s.members.map(figById).filter(x => x && x.alive);
+    if (living.length < 3) {
+      for (let i = 0; i < ri(1, 2); i++) {
+        const f = makeFigure({ align: s.align, sect: s, art: s.signatureArt, realm: 0, age: ri(13,18), talent: ri(15,70) });
+        s.members.push(f.id); STATE.figures.push(f);
+        if (s.signatureArt) s.signatureArt.holders++;
+      }
+    } else if (chance(.35) && living.length < 14) {
+      const master = pick(living.filter(x => x.realm >= 3)) || pick(living);
+      const f = makeFigure({ align: s.align, sect: s, art: s.signatureArt, realm: 0, age: ri(12,17), talent: ri(15,75), master: master ? master.id : null });
+      s.members.push(f.id); STATE.figures.push(f);
+      if (s.signatureArt) s.signatureArt.holders++;
+      if (f.talent >= 68) {
+        chron("c-lineage", `A prodigy named ${plainRef(f)} is taken in by ${sref(s)}; the elders whisper of a rare innate root.`, "normal");
+      }
+    }
+  }
+}
+
+export function sysArtRefinement() {
+  for (const a of STATE.arts) {
+    if (a.lost || a.dormant) continue;
+    const masters = aliveFigs().filter(f => f.art === a && f.realm >= 5);
+    if (masters.length && chance(.12) && a.tier < 9) {
+      a.tier++;
+      const m = pick(masters);
+      const ord = ["","first","second","third","fourth","fifth","sixth","seventh","eighth","ninth"][a.tier];
+      chron("c-art", `${ref(m)} comprehends a higher layer of ${aref(a)}, refining it to its ${ord} stratum.`, a.tier >= 7 ? "major" : "normal");
+    }
+  }
+}
+
+export function sysRivalryAndWar() {
+  const sects = aliveSects();
+  for (const w of [...STATE.activeWars]) {
+    w.years++;
+    const A = STATE.sects.find(s => s.id === w.a), B = STATE.sects.find(s => s.id === w.b);
+    if (!A || !B || !A.alive || !B.alive) { endWar(w, A, B); continue; }
+    const pa = sectMight(A), pb = sectMight(B);
+    if (chance(.5)) battle(A, B, pa, pb, w);
+    if (w.years >= 2 && (chance(.3) || Math.abs(pa - pb) > pa * 0.6)) {
+      const winner = pa >= pb ? A : B, loser = pa >= pb ? B : A;
+      endWar(w, A, B, winner, loser);
+    }
+  }
+  if (sects.length >= 2 && STATE.activeWars.length < 2 && chance(.22)) {
+    const a = pick(sects); let b = pick(sects); let g = 0; while (b === a && g++ < 5) b = pick(sects);
+    if (a !== b && !warExists(a, b)) {
+      const enemyPaths = (a.align === "demonic" && b.align === "orthodox") || (a.align === "orthodox" && b.align === "demonic");
+      if (enemyPaths || chance(.4)) {
+        const wn = pick(WAR_NAMES);
+        const w = { a: a.id, b: b.id, name: wn[0], kr: wn[1], years: 0, start: STATE.year };
+        STATE.activeWars.push(w);
+        a.atWarWith.push(b.id); b.atWarWith.push(a.id);
+        const cause = enemyPaths ? "the orthodox cannot abide the demonic" :
+          pick(["a stolen manual","an assassinated elder","a contested mountain","an old blood-debt","a marriage betrayed","a duel gone wrong"]);
+        chron("c-war", `${pick(["Banners rise","War drums sound","Blood is sworn"])}: ${sref(a)} and ${sref(b)} fall into open war — ${w.name} (${w.kr}) — over ${cause}.`, "major");
+      }
+    }
+  }
+}
+
+export function sysCorruptionAndThreat() {
+  for (const f of aliveFigs()) {
+    if (f.align !== "recluse") {
+      let drift = 0;
+      if (f.art && f.art.corruption > 30) drift += rand() * 1.5;
+      if (f.grudges.length) drift += rand() * 1.2;
+      if (STATE.activeWars.length) drift += rand() * 0.6;
+      if (drift > 0) alignShift(f, drift);
+    }
+    if (!STATE.threatActive && f.align === "demonic" && f.realm >= 7 && f.alignmentDrift >= 85 && chance(.4)) {
+      f.isThreat = true; STATE.threatActive = true;
+      maybeName(f);
+      chron("c-threat", `A shadow falls over all under heaven: ${ref(f)} ascends as the <b style="color:var(--blood)">Heavenly Demon (천마)</b> and declares the old order finished. ${f.lineage ? `Heir to ${f.lineage}, ` : ""}the Murim trembles.`, "epic");
+    }
+  }
+  if (STATE.threatActive) {
+    const threat = aliveFigs().find(f => f.isThreat);
+    if (threat && chance(.35)) {
+      const heroes = aliveFigs().filter(f => f.align !== "demonic" && f.realm >= 5 && f !== threat);
+      if (heroes.length >= 2) {
+        const champ = heroes.sort((a, b) => b.power - a.power)[0];
+        if (champ.power > threat.power * 0.85 && chance(.5)) {
+          killFigure(threat, `is at last cut down by ${champ.byeolho ? cap(champ.byeolho.en) : champ.name} and the orthodox alliance (무림맹)`);
+          champ.fame += 20; maybeName(champ);
+          chron("c-rise", `${ref(champ)} is hailed across the Murim as the hero who slew the Heavenly Demon.`, "major");
+        } else {
+          killFigure(champ, `is slain confronting the Heavenly Demon`);
+        }
+      }
+    }
+  }
+}
+
+export function sysLostAndFound() {
+  for (const a of STATE.arts) {
+    if (!a.lost && !a.dormant && a.holders <= 0 && chance(.5)) {
+      loseArt(a, "its last practitioner dead, the manual mislaid");
+    }
+  }
+  const lost = STATE.arts.filter(a => a.lost || a.dormant);
+  if (lost.length && chance(.14)) {
+    const a = pick(lost);
+    const arch = pick([
+      { n: "a destitute beggar",      t: ri(70,95) },
+      { n: "an orphaned woodcutter",  t: ri(65,90) },
+      { n: "a disgraced servant",     t: ri(60,88) },
+      { n: "a wandering mute child",  t: ri(72,96) },
+      { n: "a condemned prisoner",    t: ri(60,85) }
+    ]);
+    const f = makeFigure({ align: a.dormant ? "demonic" : (a.align === "demonic" ? "unorthodox" : a.align), realm: 1, age: ri(15,24), talent: arch.t, art: a });
+    a.lost = false; a.dormant = false; a.holders = 1;
+    if (a.lostHolder) f.lineage = a.lostHolder + "'s legacy";
+    STATE.figures.push(f);
+    chron("c-found2", `In ${pick(REGIONS)}, ${arch.n} named ${plainRef(f)} stumbles upon ${aref(a)}, lost ${STATE.year - (a.lostYear || a.origin)} years. Fate chooses strangely.`, "major");
+    if (a.dormant || a.corruption > 50) {
+      chron("c-corrupt", `The manual is steeped in old malice. Those who hear of it fear what ${plainRef(f)} may become.`, "normal");
+    }
+  }
+}
+
+export function sysSectFortune() {
+  for (const s of aliveSects()) {
+    s.prestige = clamp(s.prestige + (rand() - 0.45) * 4, 0, 100);
+    if (s.prestige <= 4 && chance(.5)) dissolveSect(s, "withered into obscurity, its halls left empty");
+  }
+  if (aliveSects().length < 7 && chance(.16)) {
+    const wanderers = aliveFigs().filter(f => !f.sect && f.realm >= 5);
+    if (wanderers.length) {
+      const founder = pick(wanderers);
+      const s = makeSect({ align: founder.align, prestige: ri(30,50) });
+      s.signatureArt = founder.art || pick(STATE.arts.filter(a => !a.lost)) || null;
+      founder.sect = s; s.members.push(founder.id);
+      STATE.sects.push(s);
+      maybeName(founder, true);
+      chron("c-found", `From the ashes, ${ref(founder)} establishes ${sref(s)} in ${s.region}. A new power rises where the old fell.`, "major");
+    }
+  }
+}
+
+export function sysHeroicArcs() {
+  if (chance(.18)) {
+    const figs = aliveFigs().filter(f => f.realm >= 3);
+    if (figs.length >= 2) {
+      const a = pick(figs); let b = pick(figs); let g = 0; while (b === a && g++ < 4) b = pick(figs);
+      if (a !== b) {
+        const ev = pick([
+          () => `${ref(a)} and ${ref(b)} swear brotherhood beneath the peach blossoms, vowing to share fortune and ruin alike.`,
+          () => `A bitter duel: ${ref(a)} defeats ${ref(b)} atop ${pick(["Sword-Testing Cliff","the Frozen Pavilion","Lone Goose Peak","the Drunken Bridge"])}, sparing their life — and earning a lifelong grudge.`,
+          () => { a.grudges.push(b.id); return `${ref(b)} betrays ${ref(a)}, stealing a page of their manual under the new moon.`; },
+          () => `${ref(a)} takes ${ref(b)} as a sworn disciple, passing down hard-won insight.`,
+          () => `Rumour spreads that ${ref(a)} has fallen in love with ${ref(b)} — a romance the sects forbid.`
+        ]);
+        chron(pick(["c-duel","c-lineage","c-peace"]), ev(), "normal");
+      }
+    }
+  }
+}
+
+export function tick() {
+  STATE.season++;
+  if (STATE.season > 3) { STATE.season = 0; STATE.year++; }
+  const yearTurn = STATE.season === 0;
+
+  sysCultivation();
+  sysFame();
+  if (yearTurn) {
+    sysAging();
+    sysRecruitment();
+    sysArtRefinement();
+    sysRivalryAndWar();
+    sysCorruptionAndThreat();
+    sysLostAndFound();
+    sysSectFortune();
+    sysHeroicArcs();
+  }
+  STATE.dirtyPanels = true;
+}
