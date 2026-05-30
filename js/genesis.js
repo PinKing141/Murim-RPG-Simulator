@@ -1,7 +1,7 @@
 import { RNG, makeRNG, ri, pick, chance } from './rng.js';
 import { REGIONS, TERRAIN } from './data.js';
-import { STATE, makeArt, makeSect, makeFigure, addToSect, aliveSects, makeRegion, regionByName } from './state.js';
-import { chron, ref, sref, aref } from './chronicle.js';
+import { STATE, makeArt, makeSect, makeFigure, addToSect, aliveSects, makeRegion, regionByName, makeRelic } from './state.js';
+import { chron, ref, sref, aref, rref } from './chronicle.js';
 import { maybeName } from './systems.js';
 
 export function genesis(seed) {
@@ -9,7 +9,7 @@ export function genesis(seed) {
   Object.assign(STATE, {
     idc: 1, evc: 1, year: 1, season: 0,
     seasonNames: ["Spring","Summer","Autumn","Winter"],
-    figures: [], sects: [], arts: [], blocs: [], regions: [],
+    figures: [], sects: [], arts: [], blocs: [], regions: [], relics: [],
     log: [], eventIndex: new Map(), figIndex: new Map(),
     dirtyLog: true, dirtyPanels: true,
     activeWars: [], threatActive: false, lastThreatFall: null,
@@ -54,6 +54,21 @@ export function genesis(seed) {
   for (let i = 0; i < ri(3, 6); i++) {
     const f = makeFigure({ align: pick(["recluse","unorthodox","orthodox"]), realm: ri(1,3), age: ri(20,40) });
     STATE.figures.push(f);
+  }
+
+  /* a legendary relic or two already exist when the age begins, held by the mighty */
+  const mighty = STATE.figures.filter(f => f.realm >= 4);
+  for (let i = 0; i < ri(1, 2); i++) {
+    const holder = mighty.length ? pick(mighty) : null;
+    const r = makeRelic({ holderId: holder ? holder.id : null, align: holder ? holder.align : undefined });
+    r.forgedYear = STATE.year - ri(20, 200);   // forged in a forgotten age
+    if (holder) r.holderName = holder.name;
+    STATE.relics.push(r);
+    const ev = chron("c-relic",
+      `${rref(r)}, a ${r.noun} ${pick(["spoken of in legend","forged in a forgotten age","whose origin none can agree upon"])}, ${holder ? `rests in the hands of ${ref(holder)}` : "lies hidden somewhere in the Gangho"}.`,
+      "major", holder ? [holder.id] : [], []);
+    r.originEvent = ev.id;
+    r.history.push({ year: r.forgedYear, holderId: holder ? holder.id : null, holderName: holder ? holder.name : null, deed: "was first spoken of", eventId: ev.id });
   }
 
   chron("c-peace",

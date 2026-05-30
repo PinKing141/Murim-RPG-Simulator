@@ -346,6 +346,7 @@ button.ctl.primary:hover {
 .entry .txt .sn  { color: #5fa8d8; font-weight: 500; }
 .entry .txt .bn  { color: var(--gold); font-weight: 600; letter-spacing: .02em; }
 .entry .txt em.art { color: #a868d8; font-style: italic; }
+.entry .txt .rn  { color: #e0b850; font-weight: 600; font-style: italic; letter-spacing: .02em; }
 
 .entry .tag {
   font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .1em;
@@ -386,6 +387,10 @@ button.ctl.primary:hover {
 .c-faction     { --dot: var(--gold-bright); }
 .c-schism      { --dot: #c84030; }
 .c-region      { --dot: #4a9858; }
+.c-relic       { --dot: #d0a838; }
+.c-tourney     { --dot: var(--azure); }
+.c-assassin    { --dot: #a02828; }
+.c-hermit      { --dot: var(--eunja); }
 
 /* ================================================================
    FIGURE CARDS
@@ -716,6 +721,7 @@ button.ctl.primary:hover {
 .chain-text .sn { color: #5fa8d8; font-weight: 500; }
 .chain-text .bn { color: var(--gold); font-weight: 600; }
 .chain-text em.art { color: #a868d8; font-style: italic; }
+.chain-text .rn { color: #e0b850; font-weight: 600; font-style: italic; }
 
 .chain-link { text-align: center; color: var(--ink-faint); font-size: 12px; line-height: 1; padding: 4px 0; }
 
@@ -734,6 +740,10 @@ button.ctl.primary:hover {
 .chain-row.c-faction     { --dot: var(--gold-bright); }
 .chain-row.c-schism      { --dot: #c84030; }
 .chain-row.c-region      { --dot: #4a9858; }
+.chain-row.c-relic       { --dot: #d0a838; }
+.chain-row.c-tourney     { --dot: var(--azure); }
+.chain-row.c-assassin    { --dot: #a02828; }
+.chain-row.c-hermit      { --dot: var(--eunja); }
 
 .chain-empty {
   font-family: 'Cormorant Garamond', serif; font-style: italic;
@@ -969,6 +979,43 @@ button.ctl.primary:hover {
 .entry.c-affinity .txt {
   border-left: 2px solid rgba(13,138,96,.25); padding-left: 10px; margin-left: -10px;
 }
+
+/* ================================================================
+   ERA SUMMARY BLOCKS (folded deep past)
+   ================================================================ */
+.era-block {
+  margin: 14px 0 18px; padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--gold) 28%, var(--line));
+  border-radius: 4px;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--gold) 6%, var(--paper-2)), var(--paper-2));
+  position: relative;
+}
+.era-block::before {
+  content: "❖"; position: absolute; top: 11px; right: 14px;
+  color: var(--gold-dim); opacity: .5; font-size: 13px;
+}
+.era-title {
+  font-family: 'Cinzel', serif; font-size: 15px; letter-spacing: .04em;
+  color: var(--gold-bright); margin-bottom: 2px;
+}
+.era-kr { font-size: 12px; color: var(--gold-dim); margin-left: 4px; }
+.era-span {
+  font-family: 'Cinzel', serif; font-size: 10px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-faint); margin-bottom: 7px;
+}
+.era-summary {
+  font-family: 'Cormorant Garamond', serif; font-size: 15px;
+  color: var(--ink-dim); line-height: 1.4;
+}
+.era-highlights { margin-top: 9px; display: flex; flex-wrap: wrap; gap: 6px; }
+.era-hl {
+  font-family: 'Cinzel', serif; font-size: 10px; letter-spacing: .05em;
+  background: transparent; border: 1px solid var(--line-2);
+  color: var(--gold-dim); border-radius: 3px; padding: 2px 8px;
+  cursor: pointer; transition: all .15s;
+}
+.era-hl:hover { border-color: var(--gold); color: var(--gold-bright); }
 
 /* ================================================================
    GREAT POWERS PANEL

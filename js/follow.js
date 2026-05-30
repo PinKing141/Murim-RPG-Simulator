@@ -106,7 +106,13 @@ export function buildFigDossier(f) {
       const corrLabel = ct === "always" ? " · Inherently corruptive" : ct === "conditional" ? " · Corruptive to the resistant" : "";
       const affColor = aff === "natural" ? "var(--jade)" : aff === "resistant" ? "var(--blood)" : "var(--ink-dim)";
       h += `<div class="dos-conn"><span class="dos-role">Art</span><em class="art">${f.art.name} (${f.art.kr})</em> tier ${f.art.tier}`;
-      h += ` <span style="font-size:11px;color:${affColor}">${affLabel}${corrLabel}</span></div>`;
+      h += ` <span style="font-size:11px;color:${affColor}">${affLabel}${corrLabel}${f.art.cursed ? ' · <span style="color:var(--blood)">CURSED</span>' : ''}</span></div>`;
+    }
+    const heldRelics = STATE.relics.filter(r => !r.lost && r.holderId === f.id);
+    for (const r of heldRelics) {
+      h += `<div class="dos-conn"><span class="dos-role">Relic</span><span class="rn" style="color:#e0b850">${r.name} (${r.kr})</span>`;
+      if (r.history.length > 1) h += ` <span style="font-size:11px;color:var(--ink-faint)">· ${r.history.length} hands across the ages</span>`;
+      h += `</div>`;
     }
     if (f.sect) {
       h += `<div class="dos-conn"><span class="dos-role">Sect</span><span class="dos-link" data-follow-sect="${f.sect.id}">${f.sect.name} (${f.sect.kr})</span></div>`;

@@ -11,6 +11,7 @@ export function plainRef(f) { return `<span class="nm">${f.name}</span>`; }
 export function sref(s)  { return s ? `<span class="sn">${s.name} (${s.kr})</span>` : "a vanished house"; }
 export function aref(a)  { return a ? `<em class="art">${a.name} (${a.kr})</em>` : "a forgotten art"; }
 export function bref(b)  { return b ? `<span class="bn">${b.name} (${b.kr})</span>` : "a broken banner"; }
+export function rref(r)  { return r ? `<span class="rn">${r.name} (${r.kr})</span>` : "a lost relic"; }
 
 /* Look up an event node by its id. */
 export const evById = id => STATE.eventIndex.get(id);

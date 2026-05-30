@@ -6,6 +6,10 @@ import { aliveBlocs, blocById, sectBloc, stanceLabel } from './factions.js';
 import { FOLLOW, buildFigDossier, buildSectDossier, buildBlocDossier } from './follow.js';
 import { loc } from './i18n.js';
 import { vitals } from './metrics.js';
+import { compressLog } from './eras.js';
+
+/* how many recent years are always shown in full when era compression is on */
+const FULL_WINDOW = 40;
 
 const $ = id => document.getElementById(id);
 export let autoScroll = true;
@@ -82,12 +86,38 @@ export function renderLog() {
       setBanner(`<span class="fb-label">Following</span> <span class="fb-name">${b.name} (${b.kr})</span><span class="fb-dim"> · ${entries.length} entries</span>`);
     } else { entries = STATE.log.slice(-260); banner.style.display = 'none'; }
   } else {
-    entries = STATE.log.slice(-260);
+    entries = STATE.eraCompress ? STATE.log : STATE.log.slice(-260);
     banner.style.display = 'none';
   }
 
   const frag = document.createDocumentFragment();
   box.innerHTML = "";
+
+  /* fold the deep past into era summaries when enabled and not following anything */
+  let eraBlocks = [];
+  if (STATE.eraCompress && FOLLOW.kind == null) {
+    const cutoff = STATE.year - FULL_WINDOW;
+    const { eras, rest } = compressLog(entries, cutoff);
+    eraBlocks = eras;
+    entries = rest;
+    for (const er of eraBlocks) {
+      const block = document.createElement("div");
+      block.className = "era-block";
+      const span = er.from === er.to ? `Year ${er.from}` : `Years ${er.from}–${er.to}`;
+      let hl = '';
+      if (er.highlights.length) {
+        hl = `<div class="era-highlights">` + er.highlights.map(id =>
+          `<button class="era-hl" data-eid="${id}">⛓ a defining moment</button>`).join('') + `</div>`;
+      }
+      block.innerHTML = loc(`
+        <div class="era-title">${er.title} <span class="era-kr">${er.kr}</span></div>
+        <div class="era-span">${span}</div>
+        <div class="era-summary">${er.summary}</div>
+        ${hl}`);
+      frag.appendChild(block);
+    }
+  }
+
   let lastYear = null;
   for (const e of entries) {
     if (e.year !== lastYear) {

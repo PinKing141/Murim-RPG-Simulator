@@ -60,6 +60,13 @@ $("hangul").addEventListener("click", e => {
   if ($("chain-overlay").style.display === 'flex' && lastChainId != null) openChain(lastChainId);
   if ($("tree-overlay").style.display === 'flex' && lastTreeId != null) openTree(lastTreeId);
 });
+$("eras").addEventListener("click", e => {
+  STATE.eraCompress = !STATE.eraCompress;
+  e.target.classList.toggle("on", STATE.eraCompress);
+  e.target.textContent = STATE.eraCompress ? "📜 Eras: On" : "📜 Eras: Off";
+  STATE.dirtyLog = true;
+  renderLog();
+});
 $("speed").addEventListener("click", e => {
   if (e.target.dataset.s) {
     speed = +e.target.dataset.s;
@@ -136,6 +143,8 @@ $("tree-overlay").addEventListener("click", e => {
 
 /* ---- chain: click an event in the chronicle, or its inline cause hint ---- */
 $("chron").addEventListener("click", e => {
+  const hlEl = e.target.closest(".era-hl[data-eid]");
+  if (hlEl) { openChain(+hlEl.dataset.eid); return; }
   const causeEl = e.target.closest(".entry-cause[data-eid]");
   if (causeEl) { openChain(+causeEl.dataset.eid); return; }
   const entry = e.target.closest(".entry[data-eid]");

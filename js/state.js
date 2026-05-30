@@ -2,18 +2,19 @@ import { rand, ri, pick, chance, clamp } from './rng.js';
 import {
   SURNAMES, CLAN_SURNAMES, GIVEN,
   BH_PRE, BH_SUF, SECT_PRE, SECT_SUF, ART_PRE, ART_SUF,
-  REGIONS, TERRAIN, REGION_TERRAIN, DOCTRINES, DOCTRINE_KEYS, ALIGN_PERSONALITY_BIAS
+  REGIONS, TERRAIN, REGION_TERRAIN, DOCTRINES, DOCTRINE_KEYS, ALIGN_PERSONALITY_BIAS,
+  RELIC_TYPES, RELIC_PRE, RELIC_SUF
 } from './data.js';
 
 export const STATE = {
   idc: 1, evc: 1, year: 1, season: 0,
   seasonNames: ["Spring","Summer","Autumn","Winter"],
-  figures: [], sects: [], arts: [], blocs: [], regions: [],
+  figures: [], sects: [], arts: [], blocs: [], regions: [], relics: [],
   log: [], eventIndex: new Map(), figIndex: new Map(),
   dirtyLog: true, dirtyPanels: true,
   activeWars: [], threatActive: false, lastThreatFall: null,
   cultCooldownUntil: 0, threatCooldownUntil: 0, seed: 0,
-  showHangul: true
+  showHangul: true, eraCompress: true
 };
 
 export function newId()    { return STATE.idc++; }
@@ -55,12 +56,42 @@ export function makeArt(align) {
     tier: ri(2, 6),
     align,
     corruption: align === "demonic" ? ri(35,70) : align === "unorthodox" ? ri(15,40) : ri(0,12),
+    /* a cursed art spreads corruption passively to ANY holder, regardless of
+       personality or affinity — the manual itself is malevolent. Only demonic
+       arts are ever born cursed, and only a minority of them. */
+    cursed: align === "demonic" && chance(.28),
     lost: false, dormant: false,
     holders: 0, origin: STATE.year, lostYear: null,
     lostHolder: null, lostHolderId: null,
     lostEvent: null
   };
 }
+
+let _relicSeq = 0;
+export function makeRelicName() {
+  const p = pick(RELIC_PRE), s = pick(RELIC_SUF);
+  return { roman: p[0] + " " + s[0], kr: p[1] + s[1], en: p[2] + " " + s[2] };
+}
+
+/* a legendary object: it has a holder, a history of deeds, and can be lost */
+export function makeRelic(opts = {}) {
+  const type = opts.type || pick(RELIC_TYPES);
+  const nm = makeRelicName();
+  return {
+    id: newId(), kind: "relic",
+    name: nm.en, kr: nm.kr, roman: nm.roman,
+    type: type.kind, noun: type.noun, typeKr: type.kr,
+    align: opts.align || pick(["orthodox","unorthodox","demonic","demonic"]),
+    forgedYear: STATE.year,
+    holderId: opts.holderId != null ? opts.holderId : null,
+    holderName: null,
+    lost: false, lostYear: null,
+    seq: ++_relicSeq,
+    history: [],     // [{year, holderId, holderName, deed, eventId}]
+    originEvent: null
+  };
+}
+export const relicById = id => STATE.relics.find(r => r.id === id) || null;
 
 export function recomputeLife(f) {
   let base = 58 + f.realm * 22 + Math.floor(f.talent / 4);

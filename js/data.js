@@ -245,3 +245,47 @@ export const PATH_FLAVOR = {
   demonic:   { verb:"seized",        via:["by devouring the energy of the slain","through the blood of a hundred enemies","at the price of their remaining humanity","by feeding the demonic art within"] },
   recluse:   { verb:"quietly reached",via:["in solitude upon a nameless peak","having forgotten the affairs of men","while listening to the mountain rain","after a lifetime of stillness"] }
 };
+
+/* ---------------- legendary relics ---------------- */
+
+/* Named objects with their own history. Unlike arts (which are practised),
+   a relic is an artifact that passes hand to hand and accumulates deeds.
+   kind determines flavour; align tints its nature. */
+export const RELIC_TYPES = [
+  { kind:"sword",   noun:"blade",    kr:"검", verbs:["was forged in","drank deep in","was tempered through"] },
+  { kind:"saber",   noun:"saber",    kr:"도", verbs:["was hammered out in","tasted blood in","was quenched in"] },
+  { kind:"spear",   noun:"spear",    kr:"창", verbs:["was raised first in","pierced the line at","was blooded in"] },
+  { kind:"stele",   noun:"stele",    kr:"비", verbs:["was carved during","recorded the truth of","was raised after"] },
+  { kind:"hairpin", noun:"hairpin",  kr:"비녀", verbs:["was gifted during","hid its poison through","passed in silence during"] },
+  { kind:"seal",    noun:"seal",     kr:"인", verbs:["was cast in","commanded armies through","sealed the oath of"] },
+  { kind:"ring",    noun:"ring",     kr:"환", verbs:["was bound in","never left the hand through","was lost and found in"] },
+  { kind:"manualcase", noun:"reliquary", kr:"함", verbs:["was sealed in","kept its secret through","was opened only in"] }
+];
+
+export const RELIC_PRE = [
+  ["Hyeolryeong","혈령","Blood-Spirit"],["Cheonsa","천사","Heaven-Slaying"],["Manmu","만무","Myriad-Form"],
+  ["Bingryong","빙룡","Frost-Dragon"],["Gwimyeon","귀면","Ghost-Face"],["Jeolyeong","절영","Shadowless"],
+  ["Paewang","패왕","Tyrant-King"],["Cheongsan","청산","Azure-Mountain"],["Mangwol","만월","Full-Moon"],
+  ["Dokso","독소","Venom"],["Geumgang","금강","Diamond"],["Yongcheon","용천","Dragon-Spring"]
+];
+export const RELIC_SUF = [
+  ["geom","검","Blade"],["do","도","Saber"],["chang","창","Spear"],["bi","비","Stele"],
+  ["in","인","Seal"],["hwan","환","Ring"],["jam","잠","Hairpin"],["ham","함","Casket"]
+];
+
+/* deeds a relic can perform/witness, used to build its history line */
+export const RELIC_DEEDS = [
+  "turned the tide of",
+  "claimed a master's life in",
+  "vanished from the world after",
+  "was wrested from cooling hands at",
+  "passed to a worthier grip during"
+];
+
+/* ---------------- tournaments ---------------- */
+
+export const TOURNEY_NAMES = [
+  ["the Heroes' Assembly","군웅대회"],["the Sword Trial of the Gangho","강호검대회"],
+  ["the Grand Martial Gathering","무림대회"],["the Lone Peak Tournament","독봉비무"],
+  ["the Beggars' Conclave","개방대회"],["the Hundred Blades Meet","백검회"]
+];

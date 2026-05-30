@@ -1,10 +1,10 @@
 import { rand, ri, pick, chance, clamp, cap } from './rng.js';
-import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN, TERRAIN, REGION_TERRAIN, IMPERIAL_REGION, DOCTRINES, artAffinity, artCorruptType } from './data.js';
-import { STATE, aliveFigs, aliveSects, figById, makeFigure, makeSect, addToSect, recomputeLife, recomputePower, makeByeolho, regionByName } from './state.js';
-import { chron, ref, plainRef, sref, aref, bref } from './chronicle.js';
+import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN, TERRAIN, REGION_TERRAIN, IMPERIAL_REGION, DOCTRINES, artAffinity, artCorruptType, TOURNEY_NAMES, RELIC_DEEDS } from './data.js';
+import { STATE, aliveFigs, aliveSects, figById, makeFigure, makeSect, addToSect, recomputeLife, recomputePower, makeByeolho, regionByName, makeRelic, relicById } from './state.js';
+import { chron, ref, plainRef, sref, aref, bref, rref } from './chronicle.js';
 import {
   addGrudge, decayGrudges, bloodGrudges, dropGrudge, inheritGrudgesOnDeath,
-  propagateTaintFrom, genDistance, makeChild
+  propagateTaintFrom, genDistance, makeChild, livingChildren
 } from './bloodlines.js';
 import {
   makeBloc, aliveBlocs, allianceBloc, cultBloc, sectBloc,
@@ -167,7 +167,50 @@ export function killFigure(f, why, causes = [], killerId = null, opts = {}) {
     /* the slain pass their unsettled debts — and a new one against their killer — to their heirs */
     inheritGrudgesOnDeath(f, killerId, deathEv.id);
   }
+  /* a relic does not die with its bearer — it is claimed, or it vanishes */
+  passRelicsOnDeath(f, killerId, deathEv ? deathEv.id : null);
   return deathEv;
+}
+
+/* when a relic-bearer falls, their relic changes hands: to the killer if any,
+   else to a worthy heir, else it is lost to the world until rediscovered */
+function passRelicsOnDeath(f, killerId, deathEvId) {
+  const held = STATE.relics.filter(r => !r.lost && r.holderId === f.id);
+  for (const r of held) {
+    const killer = killerId != null ? figById(killerId) : null;
+    if (killer && killer.alive) {
+      recordRelicDeed(r, killer, "was wrested from cooling hands", deathEvId);
+      const ev = chron("c-relic",
+        `${rref(r)} passes from the fallen ${plainRef(f)} into the grip of ${ref(killer)} — ${pick(["spoils of the victor","claimed atop the corpse","a prize bought in blood"])}.`,
+        "major", [killer.id, f.id], [], deathEvId != null ? [deathEvId] : []);
+      setRelicHolder(r, killer); r.history[r.history.length - 1].eventId = ev.id;
+    } else {
+      const heir = livingChildren(f).sort((a, b) => b.power - a.power)[0];
+      if (heir && chance(.5)) {
+        const ev = chron("c-relic",
+          `${rref(r)} passes to ${ref(heir)}, heir to ${plainRef(f)} — the legacy unbroken.`,
+          "normal", [heir.id, f.id], [], deathEvId != null ? [deathEvId] : []);
+        setRelicHolder(r, heir);
+        r.history.push({ year: STATE.year, holderId: heir.id, holderName: heir.name, deed: "was inherited", eventId: ev.id });
+      } else {
+        const ev = chron("c-relic",
+          `With the death of ${plainRef(f)}, ${rref(r)} vanishes from the world — none know where it came to rest.`,
+          "major", [f.id], [], deathEvId != null ? [deathEvId] : []);
+        r.lost = true; r.lostYear = STATE.year; r.holderId = null;
+        r.history.push({ year: STATE.year, holderId: null, holderName: null, deed: "vanished from the world", eventId: ev.id });
+      }
+    }
+  }
+}
+
+export function setRelicHolder(r, f) {
+  r.holderId = f ? f.id : null;
+  r.holderName = f ? f.name : null;
+  r.lost = false;
+}
+export function recordRelicDeed(r, f, deed, eventId) {
+  r.history.push({ year: STATE.year, holderId: f ? f.id : null, holderName: f ? f.name : null, deed, eventId });
+  if (f) setRelicHolder(r, f);
 }
 
 export function loseArt(a, why, causes = []) {
@@ -397,7 +440,13 @@ export function sysCorruptionAndThreat() {
       if (f.art) {
         const ct = artCorruptType(f.art);
         const aff = artAffinity(f, f.art);
-        if (ct === "always") {
+        if (f.art.cursed) {
+          /* a cursed art corrupts EVERY holder, passively and relentlessly —
+             personality and affinity grant no protection */
+          drift += 1.0 + rand() * 1.4;
+          if (f.originEvent != null) causes.push(f.originEvent);
+          else if (f.art.lostEvent != null) causes.push(f.art.lostEvent);
+        } else if (ct === "always") {
           /* demonic arts are inherently corruptive — resistance slows but never stops */
           const base = rand() * 1.6;
           drift += aff === "resistant" ? base * 0.6 : aff === "natural" ? base * 1.3 : base;
@@ -1288,6 +1337,145 @@ export function sysTension() {
   }
 }
 
+/* ---- legendary relics: forging, deeds, loss, rediscovery ---- */
+export function sysRelics() {
+  /* a new relic is forged or surfaces now and then */
+  if (chance(.05) && STATE.relics.filter(r => !r.lost).length < 8) {
+    const mighty = aliveFigs().filter(f => f.realm >= 4);
+    const holder = mighty.length && chance(.7) ? pick(mighty) : null;
+    const r = makeRelic({ holderId: holder ? holder.id : null, align: holder ? holder.align : undefined });
+    if (holder) r.holderName = holder.name;
+    STATE.relics.push(r);
+    const ev = chron("c-relic",
+      holder
+        ? `A master smith completes ${rref(r)}; ${ref(holder)} takes it up, and the Gangho takes note.`
+        : `${rref(r)} surfaces in the markets of ${pick(REGIONS)} — a ${r.noun} of fearsome repute, owner unknown.`,
+      "major", holder ? [holder.id] : [], []);
+    r.originEvent = ev.id;
+    r.history.push({ year: STATE.year, holderId: holder ? holder.id : null, holderName: holder ? holder.name : null, deed: holder ? "was forged for" : "surfaced", eventId: ev.id });
+    return;
+  }
+
+  /* a held relic occasionally performs a deed, or a lost one is rediscovered */
+  for (const r of STATE.relics) {
+    if (r.lost) {
+      /* rediscovery: a lost relic resurfaces with its history intact */
+      if (chance(.04)) {
+        const cand = aliveFigs().filter(f => f.realm >= 2);
+        if (!cand.length) continue;
+        const finder = pick(cand);
+        const lastDeed = r.history.length ? r.history[r.history.length - 1] : null;
+        const age = STATE.year - (r.lostYear || r.forgedYear);
+        const ev = chron("c-relic",
+          `${rref(r)}, lost ${age} year${age === 1 ? '' : 's'}, is unearthed by ${ref(finder)}${lastDeed && lastDeed.holderName ? ` — the same ${r.noun} that once ${pick(RELIC_DEEDS)} ${lastDeed.holderName}'s age` : ''}. History stirs.`,
+          "major", [finder.id], [], lastDeed && lastDeed.eventId != null ? [lastDeed.eventId] : (r.originEvent != null ? [r.originEvent] : []));
+        setRelicHolder(r, finder);
+        r.lostYear = null;
+        r.history.push({ year: STATE.year, holderId: finder.id, holderName: finder.name, deed: "was rediscovered", eventId: ev.id });
+      }
+      continue;
+    }
+    /* keep holder pointer valid; if holder died without the death-hook firing, mark lost */
+    const holder = r.holderId != null ? figById(r.holderId) : null;
+    if (r.holderId != null && (!holder || !holder.alive)) { r.lost = true; r.lostYear = STATE.year; r.holderId = null; continue; }
+    if (!holder) continue;
+    /* a deed: tie the relic to a war the holder's sect is fighting */
+    if (chance(.06) && STATE.activeWars.length) {
+      const w = pick(STATE.activeWars);
+      const ev = chron("c-relic",
+        `In ${w.name} (${w.kr}), ${rref(r)} ${pick(["cuts a legend into the battlefield","turns the tide","drinks deep once more"])} in the hands of ${ref(holder)}.`,
+        "normal", [holder.id], [], w.startEvent != null ? [w.startEvent] : []);
+      r.history.push({ year: STATE.year, holderId: holder.id, holderName: holder.name, deed: "turned the tide of " + w.name, eventId: ev.id });
+    }
+  }
+}
+
+/* ---- tournaments: a public gathering where rankings shift ---- */
+export function sysTournament() {
+  if (!chance(.07)) return;
+  const contenders = aliveFigs().filter(f => f.realm >= 3 && f.age < 70);
+  if (contenders.length < 4) return;
+  const tn = pick(TOURNEY_NAMES);
+  const field = [...contenders].sort((a, b) => b.power - a.power).slice(0, Math.min(8, contenders.length));
+  /* the strongest usually win, but talent and luck let an underdog break through */
+  field.sort((a, b) => (b.power + b.talent * 2 + rand() * 240) - (a.power + a.talent * 2 + rand() * 240));
+  const champ = field[0], runnerUp = field[1];
+  const open = chron("c-tourney",
+    `${tn[0]} (${tn[1]}) is convened — the mighty gather from across the Gangho to test their arts before the eyes of the world.`,
+    "major", field.slice(0, 4).map(f => f.id), []);
+  champ.fame += ri(8, 16); maybeName(champ);
+  if (champ.sect) { champ.sect.prestige = clamp(champ.sect.prestige + ri(5, 12), 0, 100); legit(champ.sect, ri(2, 6)); }
+  const upset = field.indexOf(contenders.sort((a, b) => b.power - a.power)[0]) > 1;
+  chron("c-tourney",
+    `${ref(champ)} stands victorious at ${tn[0]}, defeating ${ref(runnerUp)} in the final bout${upset ? " — an upset that will be spoken of for years" : ""}. ${champ.sect ? sref(champ.sect) + " basks in the glory." : "A wanderer's name echoes through the Gangho."}`,
+    "major", [champ.id, runnerUp.id], champ.sect ? [champ.sect.id] : [], [open.id]);
+  /* a grudge is born of a public defeat */
+  if (chance(.4)) addGrudge(runnerUp, champ.id, { event: open.id });
+}
+
+/* ---- assassinations: a covert alternative to open war ---- */
+export function sysAssassination() {
+  const plotters = aliveFigs().filter(f => f.grudges.length && f.realm >= 3 &&
+    (f.align !== "orthodox" || (DOCTRINES[f.personality] && (f.personality === "scheming" || f.personality === "mercenary" || f.personality === "wrathful"))));
+  if (!plotters.length || !chance(.16)) return;
+  const killer = pick(plotters);
+  const targetId = pick(killer.grudges);
+  const target = figById(targetId);
+  if (!target || !target.alive) return;
+  const cause = killer.grudgeCause[targetId] != null ? [killer.grudgeCause[targetId]] : [];
+  /* the deadlier and more cunning the killer relative to the target, the better the odds */
+  const edge = (killer.power + killer.talent * 3) / Math.max(1, target.power + target.talent * 3 + (target.realm >= 6 ? 400 : 0));
+  const succeeds = chance(clamp(0.18 + edge * 0.32, 0.08, 0.7));
+  if (succeeds) {
+    killFigure(target, `is found slain in the night — a blade between the ribs, no witnesses`, cause, killer.id,
+      { cls: "c-assassin", level: target.realm >= 5 ? "major" : "normal",
+        html: `${ref(target)}${target.sect ? " of " + target.sect.name : ""} is found slain in the night, struck down by an unseen hand. Whispers name ${ref(killer)}.` });
+  } else {
+    const ev = chron("c-assassin",
+      `An assassin's blade seeks ${ref(target)} in the dark — but the strike fails. ${pick(["The would-be killer flees into the night","Blood is shed, but not the blood intended","The attempt only sharpens the feud"])}, and suspicion falls on ${ref(killer)}.`,
+      "normal", [target.id, killer.id], [], cause);
+    addGrudge(target, killer.id, { event: ev.id, blood: true });
+  }
+}
+
+/* ---- wandering hermits: figures who refuse all sects, becoming power vacuums ---- */
+export function sysHermits() {
+  /* a powerful figure occasionally renounces the sects to wander alone */
+  if (chance(.05)) {
+    const cand = aliveFigs().filter(f => f.sect && f.realm >= 5 && f.align !== "demonic" && f.age >= 40);
+    if (cand.length) {
+      const f = pick(cand);
+      const oldSect = f.sect;
+      oldSect.members = oldSect.members.filter(id => id !== f.id);
+      f.sect = null; f.align = chance(.5) ? "recluse" : f.align;
+      recomputeLife(f);
+      chron("c-hermit",
+        `${ref(f)} renounces ${sref(oldSect)} and all ties to the sects, vanishing into ${pick(["the deep mountains","the misted wilds","a nameless peak","the bamboo sea"])} to walk the path alone.`,
+        "major", [f.id], [oldSect.id]);
+      legit(oldSect, -ri(3, 8));
+    }
+  }
+  /* a renowned wanderer becomes a gravity well — sects court them, or fear them.
+     at most one such story surfaces in a given year, and only rarely */
+  if (chance(.12)) {
+    const hermits = aliveFigs().filter(f => !f.sect && f.realm >= 6 && f.namedAt != null);
+    if (hermits.length) {
+      const h = pick(hermits);
+      const suitors = aliveSects().filter(s => s.alive && (s.align === h.align || h.align === "recluse"));
+      if (suitors.length && chance(.4)) {
+        const s = suitors.sort((a, b) => sectMight(b) - sectMight(a))[0];
+        chron("c-hermit",
+          `${sref(s)} sends envoys deep into the wilds, beseeching the hermit ${ref(h)} to lend their strength. ${pick(["The mountain does not answer","Whether they will descend, none can say","The offer hangs unanswered in the mist"])}.`,
+          "normal", [h.id], [s.id]);
+      } else {
+        chron("c-hermit",
+          `Travellers speak in hushed tones of ${ref(h)}, the hermit whose power rivals any sect master — a storm that bows to no banner.`,
+          "normal", [h.id], []);
+      }
+    }
+  }
+}
+
 export function tick() {
   STATE.season++;
   if (STATE.season > 3) { STATE.season = 0; STATE.year++; }
@@ -1302,7 +1490,11 @@ export function tick() {
     sysRecruitment();
     sysArtRefinement();
     sysRivalryAndWar();
+    sysTournament();
+    sysAssassination();
     sysCorruptionAndThreat();
+    sysHermits();
+    sysRelics();
     sysFactions();
     sysIdeology();
     sysPatronage();
