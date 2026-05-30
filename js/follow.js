@@ -219,10 +219,8 @@ export function buildFigDossier(f) {
     }
   }
 
-  // bloodline tree button
-  if (parents.length || children.length || f.children?.length) {
-    h += `<button class="why-btn tree-btn" data-open-tree="${f.id}">🌳 View Bloodline Tree</button>`;
-  }
+  // history explorer — blood, art, burdens, legacy
+  h += `<button class="why-btn tree-btn" data-open-tree="${f.id}">📜 Explore Their History</button>`;
 
   // blood grudges callout
   if (bloodGrudgeIds.length) {

@@ -19,12 +19,13 @@ function openChain(eid) {
 }
 function closeChain() { $("chain-overlay").style.display = 'none'; }
 
-/* ---- tree viewer ---- */
-let lastTreeId = null;
-function openTree(figId) {
-  lastTreeId = +figId;
-  $("tree-body").innerHTML = loc(buildTreeView(+figId));
+/* ---- history explorer ---- */
+let lastTreeId = null, lastTreeMode = 'blood';
+function openTree(figId, mode = lastTreeMode) {
+  lastTreeId = +figId; lastTreeMode = mode;
+  $("tree-body").innerHTML = loc(buildTreeView(+figId, mode));
   $("tree-overlay").style.display = 'flex';
+  $("tree-body").scrollTop = 0;
 }
 function closeTree() { $("tree-overlay").style.display = 'none'; }
 
@@ -58,7 +59,7 @@ $("hangul").addEventListener("click", e => {
   renderLog(); renderPanels();
   /* refresh whichever reader overlay is open so it re-localises too */
   if ($("chain-overlay").style.display === 'flex' && lastChainId != null) openChain(lastChainId);
-  if ($("tree-overlay").style.display === 'flex' && lastTreeId != null) openTree(lastTreeId);
+  if ($("tree-overlay").style.display === 'flex' && lastTreeId != null) openTree(lastTreeId, lastTreeMode);
 });
 $("eras").addEventListener("click", e => {
   STATE.eraCompress = !STATE.eraCompress;
@@ -129,10 +130,18 @@ $("dossier-wrap").addEventListener("click", e => {
   if (fb) { setFollow('bloc', +fb.dataset.followBloc); renderLog(); renderPanels(); }
 });
 
-/* ---- tree: navigate within the tree ---- */
+/* ---- explorer: navigate within the history explorer ---- */
 $("tree-body").addEventListener("click", e => {
+  const modeBtn = e.target.closest("[data-mode]");
+  if (modeBtn) { openTree(+modeBtn.dataset.fig, modeBtn.dataset.mode); return; }
+  const chainBtn = e.target.closest("[data-chain]");
+  if (chainBtn) { openChain(+chainBtn.dataset.chain); return; }
+  const explore = e.target.closest("[data-explore]");
+  if (explore) { openTree(+explore.dataset.explore); return; }
   const treeBtn = e.target.closest("[data-open-tree]");
-  if (treeBtn) { openTree(treeBtn.dataset.openTree); return; }
+  if (treeBtn) { openTree(+treeBtn.dataset.openTree); return; }
+  const fs = e.target.closest("[data-follow-sect]");
+  if (fs) { closeTree(); setFollow('sect', +fs.dataset.followSect); renderLog(); renderPanels(); return; }
   const ff = e.target.closest("[data-follow-fig]");
   if (ff) { closeTree(); setFollow('fig', +ff.dataset.followFig); renderLog(); renderPanels(); }
 });
