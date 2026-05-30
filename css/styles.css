@@ -961,6 +961,14 @@ button.ctl.primary:hover {
   font-style: italic; border-left: 2px solid rgba(144,64,192,.25);
   padding-left: 10px; margin-left: -10px;
 }
+.c-corruption { --dot: var(--blood); }
+.entry.c-corruption .txt {
+  border-left: 2px solid rgba(181,42,32,.3); padding-left: 10px; margin-left: -10px;
+}
+.c-affinity { --dot: var(--jade); }
+.entry.c-affinity .txt {
+  border-left: 2px solid rgba(13,138,96,.25); padding-left: 10px; margin-left: -10px;
+}
 
 /* ================================================================
    GREAT POWERS PANEL

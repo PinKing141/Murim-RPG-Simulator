@@ -172,6 +172,55 @@ export const ALIGN_PERSONALITY_BIAS = {
   recluse:    ["reclusive","scholarly","devout","honourable","scheming","wrathful"]
 };
 
+/* ---------------- art affinity ---------------- */
+
+/* Which personalities flow naturally with which art alignments.
+   "natural"  → cultivation bonus, minimal corruption bleed
+   "neutral"  → no modifier
+   "resistant"→ cultivation penalty, faster corruption bleed if art is corruptive */
+export const ART_AFFINITY = {
+  demonic: {
+    natural:   ["bloodthirsty","wrathful","fanatical","ambitious"],
+    neutral:   ["scheming","mercenary"],
+    resistant: ["honourable","devout","scholarly","reclusive"]
+  },
+  unorthodox: {
+    natural:   ["scheming","mercenary","ambitious","wrathful"],
+    neutral:   ["bloodthirsty","fanatical","reclusive"],
+    resistant: ["honourable","devout","scholarly"]
+  },
+  orthodox: {
+    natural:   ["honourable","devout","scholarly","reclusive","fanatical"],
+    neutral:   ["ambitious","scheming"],
+    resistant: ["bloodthirsty","wrathful","mercenary"]
+  },
+  recluse: {
+    natural:   ["reclusive","scholarly","devout"],
+    neutral:   ["honourable","fanatical","ambitious"],
+    resistant: ["bloodthirsty","wrathful","scheming","mercenary"]
+  }
+};
+
+/* return "natural" | "neutral" | "resistant" for a figure's relationship to an art */
+export function artAffinity(f, art) {
+  if (!art || !f.personality) return "neutral";
+  const tiers = ART_AFFINITY[art.align] || ART_AFFINITY.orthodox;
+  if (tiers.natural.includes(f.personality))   return "natural";
+  if (tiers.resistant.includes(f.personality)) return "resistant";
+  return "neutral";
+}
+
+/* Arts are corruptive based on their alignment, not a raw number.
+   "always"      → demonic arts: corruption is inherent, unavoidable
+   "conditional" → unorthodox arts: only corrupts the susceptible
+   "never"       → orthodox/recluse arts: inert; misuse is the wielder's sin */
+export function artCorruptType(art) {
+  if (!art) return "never";
+  if (art.align === "demonic")    return "always";
+  if (art.align === "unorthodox") return "conditional";
+  return "never";
+}
+
 export const WAR_NAMES = [
   ["the Great Orthodox-Demon War","정마대전"],["the Blood Calamity","무림혈겁"],
   ["the Ten-Year War","십년대전"],["the Struggle for Supremacy","천하쟁패"],

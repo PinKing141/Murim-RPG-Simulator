@@ -1,5 +1,5 @@
 import { cap, clamp } from './rng.js';
-import { ALIGN, REALMS, REALM_KR, TERRAIN, DOCTRINES } from './data.js';
+import { ALIGN, REALMS, REALM_KR, TERRAIN, DOCTRINES, artAffinity, artCorruptType } from './data.js';
 import { STATE, figById, regionByName } from './state.js';
 import { bloodGrudges } from './bloodlines.js';
 import { stanceLabel } from './factions.js';
@@ -100,7 +100,13 @@ export function buildFigDossier(f) {
   if (hasConnections) {
     h += `<div class="dos-sec">Connections</div>`;
     if (f.art) {
-      h += `<div class="dos-conn"><span class="dos-role">Art</span><em class="art">${f.art.name} (${f.art.kr})</em> tier ${f.art.tier}</div>`;
+      const aff = artAffinity(f, f.art);
+      const ct  = artCorruptType(f.art);
+      const affLabel = aff === "natural" ? "⬆ Natural affinity" : aff === "resistant" ? "⬇ Resists this art" : "Neutral";
+      const corrLabel = ct === "always" ? " · Inherently corruptive" : ct === "conditional" ? " · Corruptive to the resistant" : "";
+      const affColor = aff === "natural" ? "var(--jade)" : aff === "resistant" ? "var(--blood)" : "var(--ink-dim)";
+      h += `<div class="dos-conn"><span class="dos-role">Art</span><em class="art">${f.art.name} (${f.art.kr})</em> tier ${f.art.tier}`;
+      h += ` <span style="font-size:11px;color:${affColor}">${affLabel}${corrLabel}</span></div>`;
     }
     if (f.sect) {
       h += `<div class="dos-conn"><span class="dos-role">Sect</span><span class="dos-link" data-follow-sect="${f.sect.id}">${f.sect.name} (${f.sect.kr})</span></div>`;

@@ -1,5 +1,5 @@
 import { rand, ri, pick, chance, clamp, cap } from './rng.js';
-import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN, TERRAIN, REGION_TERRAIN, IMPERIAL_REGION, DOCTRINES } from './data.js';
+import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN, TERRAIN, REGION_TERRAIN, IMPERIAL_REGION, DOCTRINES, artAffinity, artCorruptType } from './data.js';
 import { STATE, aliveFigs, aliveSects, figById, makeFigure, makeSect, addToSect, recomputeLife, recomputePower, makeByeolho, regionByName } from './state.js';
 import { chron, ref, plainRef, sref, aref, bref } from './chronicle.js';
 import {
@@ -257,6 +257,12 @@ export function sysCultivation() {
     if (f.align === "demonic") gain *= 1.25;
     if (f.align === "recluse") gain *= 0.8;
     if (f.sect) gain *= 1.1;
+    /* affinity with the art shapes cultivation speed */
+    if (f.art) {
+      const aff = artAffinity(f, f.art);
+      if (aff === "natural")   gain *= 1.18;
+      else if (aff === "resistant") gain *= 0.78;
+    }
     f.progress += gain;
     if (f.progress >= 100) {
       f.progress = 0; f.realm++;
@@ -385,17 +391,51 @@ export function sysCorruptionAndThreat() {
     if (f.align !== "recluse") {
       let drift = 0;
       const causes = [];
-      if (f.art && f.art.corruption > 30) {
-        drift += rand() * 1.5;
-        if (f.originEvent != null) causes.push(f.originEvent);
-        else if (f.art.lostEvent != null) causes.push(f.art.lostEvent);
+
+      /* art corruption: demonic arts always corrupt; unorthodox arts only corrupt
+         the susceptible (resistant personalities suffer more, naturals less) */
+      if (f.art) {
+        const ct = artCorruptType(f.art);
+        const aff = artAffinity(f, f.art);
+        if (ct === "always") {
+          /* demonic arts are inherently corruptive — resistance slows but never stops */
+          const base = rand() * 1.6;
+          drift += aff === "resistant" ? base * 0.6 : aff === "natural" ? base * 1.3 : base;
+          if (f.originEvent != null) causes.push(f.originEvent);
+          else if (f.art.lostEvent != null) causes.push(f.art.lostEvent);
+        } else if (ct === "conditional" && aff === "resistant") {
+          /* unorthodox art in resistant hands: the friction itself corrupts */
+          drift += rand() * 0.9;
+          if (f.originEvent != null) causes.push(f.originEvent);
+        }
+        /* orthodox/recluse arts: no corruption from the art itself */
       }
+
       if (f.grudges.length) {
         drift += rand() * 1.2;
         for (const tid of f.grudges) { if (f.grudgeCause[tid] != null) { causes.push(f.grudgeCause[tid]); break; } }
       }
       if (STATE.activeWars.length) drift += rand() * 0.6;
       if (drift > 0) alignShift(f, drift, null, causes);
+
+      /* mastery ceiling: resistant figures plateau earlier — past realm 6 progress halves */
+      if (f.art && f.realm >= 6 && artAffinity(f, f.art) === "resistant") {
+        f.progress = Math.min(f.progress, 70);
+      }
+
+      /* chronicle the struggle when a resistant figure persists with a corruptive art */
+      if (f.art && artCorruptType(f.art) === "always" && artAffinity(f, f.art) === "resistant"
+          && f.alignmentDrift >= 45 && f.alignmentDrift < 48 && chance(.35)) {
+        chron("c-corruption",
+          `The ${f.art.name} (${f.art.kr}) does not fit ${ref(f)} — yet ${pick(["they refuse to lay it down","the art has already taken root","pride will not let them stop"])}. The meridians ache; the mind darkens.`,
+          "normal", [f.id], [], f.originEvent != null ? [f.originEvent] : []);
+      }
+      /* chronicle the harmony when a natural figure and their art become one */
+      if (f.art && artAffinity(f, f.art) === "natural" && f.realm === 5 && f.progress < 5 && chance(.25)) {
+        chron("c-affinity",
+          `${ref(f)} and the ${f.art.name} (${f.art.kr}) have grown inseparable — the art no longer feels like a manual to be memorised, but a second nature.`,
+          "normal", [f.id], [], []);
+      }
     }
     if (!STATE.threatActive && STATE.year >= STATE.threatCooldownUntil && f.align === "demonic" && f.realm >= 7 && f.alignmentDrift >= 85 && chance(.4)) {
       f.isThreat = true; STATE.threatActive = true;
@@ -459,7 +499,7 @@ export function sysLostAndFound() {
       `In ${pick(REGIONS)}, ${arch.n} named ${plainRef(f)} stumbles upon ${aref(a)}, lost ${STATE.year - (a.lostYear || a.origin)} years. Fate chooses strangely.`,
       "major", [f.id], [], lostEv != null ? [lostEv] : []);
     f.originEvent = found.id;
-    if (a.dormant || a.corruption > 50) {
+    if (a.dormant || a.align === "demonic") {
       chron("c-corrupt",
         `The manual is steeped in old malice. Those who hear of it fear what ${plainRef(f)} may become.`,
         "normal", [f.id], [], [found.id]);
@@ -1161,7 +1201,7 @@ export function sysIdeology() {
 
     /* reform vs tradition — a renowned non-conformist forces the house's hand */
     const reformer = living.find(f => f.realm >= 4 && f.namedAt != null && !f.reformChecked &&
-      ((f.art && f.art.corruption > 40) || (s.align === "orthodox" && f.align !== "orthodox")));
+      ((f.art && f.art.align === "demonic") || (s.align === "orthodox" && f.align !== "orthodox")));
     if (reformer) {
       reformer.reformChecked = true;
       if (s.legitimacy >= 55 && chance(.5)) {
