@@ -134,8 +134,10 @@ $("tree-overlay").addEventListener("click", e => {
   if (e.target === $("tree-overlay")) closeTree();
 });
 
-/* ---- chain: click an event in the chronicle ---- */
+/* ---- chain: click an event in the chronicle, or its inline cause hint ---- */
 $("chron").addEventListener("click", e => {
+  const causeEl = e.target.closest(".entry-cause[data-eid]");
+  if (causeEl) { openChain(+causeEl.dataset.eid); return; }
   const entry = e.target.closest(".entry[data-eid]");
   if (entry) openChain(entry.dataset.eid);
 });

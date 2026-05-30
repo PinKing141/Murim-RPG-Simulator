@@ -15,6 +15,27 @@ function bar(v, max, color) {
   return `<div class="mini"><i style="width:${clamp(v/max*100,0,100)}%;background:${color}"></i></div>`;
 }
 
+/* strip HTML tags for plain-text snippets */
+function plainText(html) {
+  return (html || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+}
+
+/* one-line "why" reason for a great-power sect */
+function powerReason(s) {
+  const b = sectBloc(s.id);
+  if (s.patron) return "holds Imperial Court patronage";
+  if (b) {
+    const lead = b.leaderId != null ? figById(b.leaderId) : null;
+    if (lead && lead.sect && lead.sect.id === s.id)
+      return b.type === "alliance" ? "leads the Murim Alliance" : "commands the Demonic Cult";
+  }
+  if (s.legitimacy > 70) return "deepest claim to authority in the Murim";
+  if (s.signatureArt && !s.signatureArt.lost && s.signatureArt.tier >= 5)
+    return `sole master of ${s.signatureArt.name}`;
+  if (s.prestige > 70 && s.atWarWith.length === 0) return "unbroken record of victories";
+  return "dominant by sheer force of arms";
+}
+
 /* ---- log rendering ---- */
 
 export function renderLog() {
@@ -80,7 +101,19 @@ export function renderLog() {
     const d = document.createElement("div");
     d.className = `entry ${e.cls} ${e.level === "major" ? "major" : ""} ${e.level === "epic" ? "epic major" : ""}${hasChain ? " has-chain" : ""}`;
     d.dataset.eid = e.id;
-    d.innerHTML = `<span class="txt"><span class="tag">${STATE.seasonNames[e.season]}</span>${loc(e.html)}${hasChain ? `<span class="chain-mark" title="Trace cause &amp; consequence">⛓</span>` : ""}</span>`;
+
+    /* inline cause surfacing: show a brief trace for major/epic events */
+    let causeHint = '';
+    if (e.level !== 'normal' && e.causes && e.causes.length) {
+      const causeEv = STATE.eventIndex.get(e.causes[0]);
+      if (causeEv && causeEv.year !== e.year) {
+        const snippet = plainText(loc(causeEv.html) || causeEv.html);
+        const short = snippet.length > 72 ? snippet.slice(0, 72) + '…' : snippet;
+        causeHint = `<div class="entry-cause" data-eid="${causeEv.id}">↳ Year ${causeEv.year} — <em>${short}</em></div>`;
+      }
+    }
+
+    d.innerHTML = `<span class="txt"><span class="tag">${STATE.seasonNames[e.season]}</span>${loc(e.html)}${hasChain ? `<span class="chain-mark" title="Trace cause &amp; consequence">⛓</span>` : ""}</span>${causeHint}`;
     frag.appendChild(d);
   }
   box.appendChild(frag);
@@ -115,6 +148,31 @@ export function renderPanels() {
     <div class="vrow"><span>Legitimacy Gap</span>${vbar(v.legitimacySpread, "var(--sapa)")}<b>${Math.round(v.legitimacySpread)}</b></div>
     <div class="vrow"><span>Authority</span>${vbar(v.legitimacy, "var(--gold)")}<b>${Math.round(v.legitimacy)}</b></div>
     <div class="vrow"><span>Realm Health</span>${vbar(v.regionHealth, "var(--jeongpa)")}<b>${Math.round(v.regionHealth)}</b></div>`;
+
+  /* ---- great powers readout ---- */
+  const powersEl = $("powers-panel");
+  if (powersEl) {
+    const liveSects = aliveSects().filter(s => s.alive);
+    const top = [...liveSects].sort((a, b) => sectMight(b) - sectMight(a)).slice(0, 3);
+    if (top.length) {
+      let html = `<div class="panel-title">Great Powers <span class="ct">${top.length}</span></div>`;
+      for (const s of top) {
+        const al = ALIGN[s.align];
+        const lead = topMember(s);
+        const lName = lead ? (lead.byeolho && lead.namedAt != null ? cap(lead.byeolho.en) : lead.name) : "—";
+        const lRealm = lead ? (STATE.showHangul ? REALM_KR[lead.realm] : REALMS[lead.realm]) : "";
+        const reason = powerReason(s);
+        html += loc(`<div class="power-card" style="--c:${al.c}">
+          <div class="power-name">${s.kr}<span class="en">${s.name}</span></div>
+          <div class="power-head">${lName}${lRealm ? ' · ' + lRealm : ''}</div>
+          <div class="power-reason">↳ ${reason}</div>
+        </div>`);
+      }
+      powersEl.innerHTML = html;
+    } else {
+      powersEl.innerHTML = '';
+    }
+  }
 
   /* ---- left: power blocs ---- */
   const bl = $("bloclist");

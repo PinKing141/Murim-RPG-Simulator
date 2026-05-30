@@ -11,9 +11,59 @@ import {
   blocLeader, blocSects, strongestIn, bestLeaderIn,
   addBlocGrudge, blocGrudgeAgainst
 } from './factions.js';
+import { eraIndex } from './metrics.js';
 
 /* nudge a sect's institutional authority, kept in bounds */
 function legit(s, d) { if (s) s.legitimacy = clamp(s.legitimacy + d, 0, 100); }
+
+/* era-aware contextual phrase for embedding in chronicle entries */
+function eraTone() {
+  const era = eraIndex();
+  const pool = {
+    calamity: ["as the Demon's shadow falls over all","while calamity grips the realm","beneath the Heavenly Demon's heel"],
+    war:      ["as the realm tears itself apart","while war devours the sects","in this age of open blood"],
+    decline:  ["in these hollowed years","while the old order withers","as greatness becomes memory"],
+    golden:   ["in the height of a golden age","while the realm breathes easy","in days the songs will recall"],
+    fraying:  ["as the great oath unravels","while the alliance splinters from within","in a time of spreading mistrust"],
+    settled:  ["in the quiet between storms","while the realm holds its breath","as history gathers itself"]
+  };
+  return pick(pool[era.key] || pool.settled);
+}
+
+/* narrator voice: occasional commentary on the shape of the age */
+export function sysEraCommentary() {
+  if (!chance(.1)) return;
+  const era = eraIndex();
+  const sects = aliveSects();
+  if (!sects.length) return;
+  const pool = {
+    calamity: [
+      `The brush trembles as it writes: the Murim has not known such shadow since the forgotten ages. Of the ${sects.length} houses still standing, how many will see the Demon fall?`,
+      `Even the Gangho has gone quiet. The Heavenly Demon has made fear into a kind of order — and order, of a kind, into law.`
+    ],
+    war:      [
+      `${STATE.activeWars.length} war${STATE.activeWars.length > 1 ? 's burn' : ' burns'} at once. The roads between sects are measured in bodies now, and the neutrals grow fewer.`,
+      `History accelerates in wartime. What takes a generation in peace takes a season in war — the rise, and the ruin, both.`
+    ],
+    decline:  [
+      `A century of greatness leaves nothing behind that cannot be lost. The great houses age; the young find no masters worth the oath.`,
+      `The martial world is quieter than it has been in living memory — not from peace, but from exhaustion. What was great has thinned.`
+    ],
+    golden:   [
+      `The brush lingers over this season. The sects are at peace; the arts deepen; masters find worthy heirs. These are the years the songs will recall.`,
+      `It will not last — it never does. But write it down: the Gangho hums with talent, and the sects hold one another in something like trust.`
+    ],
+    fraying:  [
+      `The great oath holds — barely. Watch the eyes of the 맹주's own lieutenants. The knives are not yet drawn, but they are counted.`,
+      `Unity is a story the sects tell each other. The real story is older: pride, power, and slights the great oath was supposed to make everyone forget.`
+    ],
+    settled:  [
+      `Between upheavals, the smaller stories unfold: masters and students, feuds nursed across decades, arts refined in solitude. The chronicle writes them all.`,
+      `A settled realm grows complacent — and complacency makes graves. But for now, the Gangho breathes, and no storm is visible on the horizon.`
+    ]
+  };
+  chron("c-era", pick(pool[era.key] || pool.settled), "normal", [], []);
+}
 
 /* war, terror and famine bleed a region's people and order */
 function scarRegion(r, popHit, stabHit) {
@@ -307,8 +357,9 @@ export function sysRivalryAndWar() {
         const cause = grudgeEv != null ? "a feud long left to fester" :
           enemyPaths ? "the orthodox cannot abide the demonic" :
           pick(["a stolen manual","an assassinated elder","a contested mountain","an old blood-debt","a marriage betrayed","a duel gone wrong"]);
+        const eraSuffix = STATE.activeWars.length >= 2 ? `, ${eraTone()}` : '';
         const ev = chron("c-war",
-          `${pick(["Banners rise","War drums sound","Blood is sworn"])}: ${sref(a)} and ${sref(b)} fall into open war — ${w.name} (${w.kr}) — over ${cause}.`,
+          `${pick(["Banners rise","War drums sound","Blood is sworn"])}: ${sref(a)} and ${sref(b)} fall into open war — ${w.name} (${w.kr}) — over ${cause}${eraSuffix}.`,
           "major", [], [a.id, b.id], grudgeEv != null ? [grudgeEv] : []);
         w.startEvent = ev.id;
       }
@@ -523,8 +574,12 @@ export function sysVengeance() {
     if (f.power >= t.power * 0.8 && chance(.6)) {
       const meta = f.grudgeMeta[t.id];
       const cause = meta && meta.event != null ? [meta.event] : [];
-      const kin = (f.parents.includes(t.killedBy) || (figById(t.id) && false)) ? "" : "";
-      const html = `${ref(f)} hunts down ${ref(t)} at last — a blood debt, sworn ${STATE.year - (meta ? meta.born : STATE.year)} years past, paid in full in steel.`;
+      const yearsAgo = STATE.year - (meta ? meta.born : STATE.year);
+      const originEv = meta && meta.event != null ? STATE.eventIndex.get(meta.event) : null;
+      const originRef = originEv
+        ? `, a blood debt born in Year ${originEv.year}`
+        : (yearsAgo > 0 ? `, a debt ${yearsAgo} years in the making` : '');
+      const html = `${ref(f)} hunts down ${ref(t)} at last${originRef} — paid in full in steel. The chronicle closes a chapter the brush has kept open since Year ${originEv ? originEv.year : (STATE.year - yearsAgo)}.`;
       killFigure(t, "", cause, f.id, { cls: "c-vengeance", html, level: "major" });
       dropGrudge(f, t.id);
       f.fame += 8;
@@ -561,8 +616,11 @@ export function sysBloodlineAwakening() {
     }
     recomputeLife(f); recomputePower(f);
     const aName = ancestor.byeolho ? `${cap(ancestor.byeolho.en)} (${ancestor.byeolho.kr})` : ancestor.name;
+    const aEvent = ancestor.ascendEvent != null ? STATE.eventIndex.get(ancestor.ascendEvent)
+                 : ancestor.fallEvent   != null ? STATE.eventIndex.get(ancestor.fallEvent) : null;
+    const aEventNote = aEvent ? ` — whose deeds shook the Murim in Year ${aEvent.year}` : '';
     const ev = chron("c-bloodline",
-      `The blood remembers: ${ref(f)} — ${genWord(dist)}-generation descendant of the Heavenly Demon ${aName}, dead ${STATE.year - ancestor.diedYear} years before they were ever born — awakens the taint sleeping in their veins.${artNote}`,
+      `The blood remembers: ${ref(f)} — ${genWord(dist)}-generation descendant of ${aName}${aEventNote}, dead ${STATE.year - ancestor.diedYear} years — awakens the taint sleeping in their veins.${artNote}`,
       "epic", [f.id], [], ancestor.ascendEvent != null ? [ancestor.ascendEvent] : (ancestor.fallEvent != null ? [ancestor.fallEvent] : []));
     f.fallEvent = ev.id;
   }
@@ -1141,6 +1199,7 @@ export function tick() {
     sysProcreation();
     sysVengeance();
     sysBloodlineAwakening();
+    sysEraCommentary();
     sysGrudgeDecay();
   }
   STATE.dirtyPanels = true;

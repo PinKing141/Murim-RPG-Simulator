@@ -163,6 +163,7 @@ button.ctl.primary:hover {
 .panel.right > .stat-grid,
 .panel.right > .legend,
 .panel.right > #fig-panel { padding: 0 16px; }
+.panel.right > #vitals { margin: 10px 16px 4px; }
 .panel.right > .panel-title { padding-top: 18px; }
 .panel.right > .stat-grid   { margin-bottom: 14px; }
 #fig-panel { overflow-y: auto; flex: 1; padding-bottom: 18px; }
@@ -892,6 +893,59 @@ button.ctl.primary:hover {
 .vrow .mini { height: 5px; border-radius: 3px; }
 .vrow .mini i { border-radius: 3px; }
 .vrow b { font-weight: 500; color: var(--ink); text-align: right; font-size: 9.5px; }
+
+/* ================================================================
+   INLINE CAUSE SURFACING
+   ================================================================ */
+
+.entry-cause {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  color: var(--ink-faint); padding: 3px 0 3px 56px;
+  line-height: 1.4; cursor: pointer; transition: color .12s;
+  letter-spacing: .01em;
+}
+.entry-cause em { color: var(--ink-dim); font-style: normal; }
+.entry-cause:hover { color: var(--gold-dim); }
+.entry-cause:hover em { color: var(--gold); }
+
+/* era commentary entries */
+.c-era { --dot: var(--gold-dim); }
+.entry.c-era .txt {
+  font-style: italic; color: var(--ink-dim); font-size: 16px;
+  border-left: 2px solid rgba(200,149,42,.2); padding-left: 10px; margin-left: -10px;
+}
+
+/* ================================================================
+   GREAT POWERS PANEL
+   ================================================================ */
+
+#powers-panel { padding: 0 16px; margin-bottom: 4px; }
+
+.power-card {
+  border: 1px solid color-mix(in srgb, var(--c) 30%, var(--line));
+  border-left: 3px solid var(--c);
+  border-radius: 4px; padding: 8px 11px; margin-bottom: 7px;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--c) 8%, #0c0f1e),
+    color-mix(in srgb, var(--c) 3%, #090c18));
+  transition: .15s;
+}
+.power-card:hover { transform: translateX(1px); }
+.power-name {
+  font-family: 'Noto Serif KR', serif; font-weight: 600; font-size: 14px; color: var(--ink);
+}
+.power-name .en {
+  display: block; font-family: 'Cinzel', serif; font-size: 10px;
+  color: var(--ink-dim); letter-spacing: .06em; font-style: normal; margin-top: 1px;
+}
+.power-head {
+  font-family: 'JetBrains Mono', monospace; font-size: 9.5px;
+  color: var(--c); margin-top: 4px; opacity: .85;
+}
+.power-reason {
+  font-family: 'Cormorant Garamond', serif; font-size: 12.5px; font-style: italic;
+  color: var(--ink-faint); margin-top: 3px; line-height: 1.3;
+}
 
 /* ================================================================
    RESPONSIVE
