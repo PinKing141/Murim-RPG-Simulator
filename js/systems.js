@@ -1,5 +1,5 @@
 import { rand, ri, pick, chance, clamp, cap } from './rng.js';
-import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN, TERRAIN, REGION_TERRAIN, IMPERIAL_REGION } from './data.js';
+import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN, TERRAIN, REGION_TERRAIN, IMPERIAL_REGION, DOCTRINES } from './data.js';
 import { STATE, aliveFigs, aliveSects, figById, makeFigure, makeSect, addToSect, recomputeLife, recomputePower, makeByeolho, regionByName } from './state.js';
 import { chron, ref, plainRef, sref, aref, bref } from './chronicle.js';
 import {
@@ -77,12 +77,14 @@ function scarRegion(r, popHit, stabHit) {
 function recruitTraits(s) {
   const r = regionByName(s.region);
   const t = r ? TERRAIN[r.terrain] : null;
+  const doc = DOCTRINES[s.doctrine];
   let lo = 15, hi = 72, drift = 0;
   if (t) {
     lo = t.talent[0]; hi = t.talent[1]; drift = t.drift;
-    const pf = (r.prosperity - 50) / 50;              // prosperity lifts the floor
+    const pf = (r.prosperity - 50) / 50;
     lo = clamp(Math.round(lo + pf * 8), 8, hi - 5);
   }
+  if (doc?.talentBonus) { lo = clamp(lo + doc.talentBonus, 8, 95); hi = clamp(hi + doc.talentBonus, lo + 5, 98); }
   return { talent: ri(lo, hi), drift };
 }
 
@@ -210,7 +212,8 @@ function battle(A, B, pa, pb, w) {
   const winner = pa >= pb ? A : B, loser = pa >= pb ? B : A;
   const slayer = topMember(winner);
   const victims = loser.members.map(figById).filter(x => x && x.alive);
-  if (victims.length > 1 && chance(.6)) {
+  const killP = clamp(0.6 + (DOCTRINES[winner.doctrine]?.killMod || 0), 0.1, 0.95);
+  if (victims.length > 1 && chance(killP)) {
     const v = pick(victims.sort((x, y) => x.power - y.power).slice(0, Math.ceil(victims.length / 2)));
     if (v) killFigure(v, `falls in battle during ${w.name} (${w.kr})`, w.startEvent != null ? [w.startEvent] : [], slayer ? slayer.id : null);
   }
@@ -319,7 +322,8 @@ export function sysArtRefinement() {
   for (const a of STATE.arts) {
     if (a.lost || a.dormant) continue;
     const masters = aliveFigs().filter(f => f.art === a && f.realm >= 5);
-    if (masters.length && chance(.12) && a.tier < 9) {
+    const artBonus = masters.reduce((mx, m) => Math.max(mx, DOCTRINES[m.sect?.doctrine]?.artBonus || 0), 0);
+    if (masters.length && chance(.12 + artBonus) && a.tier < 9) {
       a.tier++;
       const m = pick(masters);
       const ord = ["","first","second","third","fourth","fifth","sixth","seventh","eighth","ninth"][a.tier];
@@ -343,24 +347,26 @@ export function sysRivalryAndWar() {
       endWar(w, A, B, winner, loser);
     }
   }
-  if (sects.length >= 2 && STATE.activeWars.length < 2 && chance(.22)) {
+  if (sects.length >= 2 && STATE.activeWars.length < 2) {
     const a = pick(sects); let b = pick(sects); let g = 0; while (b === a && g++ < 5) b = pick(sects);
     if (a !== b && !warExists(a, b)) {
       const enemyPaths = (a.align === "demonic" && b.align === "orthodox") || (a.align === "orthodox" && b.align === "demonic");
-      if (enemyPaths || chance(.4)) {
+      const aDoc = DOCTRINES[a.doctrine], bDoc = DOCTRINES[b.doctrine];
+      const warP = 0.22 + (aDoc?.warMod || 0) + (bDoc?.warMod || 0) * 0.5;
+      if (enemyPaths || chance(warP)) {
         const wn = pick(WAR_NAMES);
         const w = { a: a.id, b: b.id, name: wn[0], kr: wn[1], years: 0, start: STATE.year, startEvent: null };
         STATE.activeWars.push(w);
         a.atWarWith.push(b.id); b.atWarWith.push(a.id);
-        /* a feud between members of the two houses is the seed of the war when one exists */
         const grudgeEv = grudgeCauseBetween(a, b);
         const cause = grudgeEv != null ? "a feud long left to fester" :
           enemyPaths ? "the orthodox cannot abide the demonic" :
           pick(["a stolen manual","an assassinated elder","a contested mountain","an old blood-debt","a marriage betrayed","a duel gone wrong"]);
         const eraSuffix = STATE.activeWars.length >= 2 ? `, ${eraTone()}` : '';
-        const ev = chron("c-war",
-          `${pick(["Banners rise","War drums sound","Blood is sworn"])}: ${sref(a)} and ${sref(b)} fall into open war — ${w.name} (${w.kr}) — over ${cause}${eraSuffix}.`,
-          "major", [], [a.id, b.id], grudgeEv != null ? [grudgeEv] : []);
+        const warLine = aDoc?.warVerb
+          ? `${sref(a)} ${aDoc.warVerb} ${sref(b)} — ${w.name} (${w.kr}) — over ${cause}${eraSuffix}.`
+          : `${pick(["Banners rise","War drums sound","Blood is sworn"])}: ${sref(a)} and ${sref(b)} fall into open war — ${w.name} (${w.kr}) — over ${cause}${eraSuffix}.`;
+        const ev = chron("c-war", warLine, "major", [], [a.id, b.id], grudgeEv != null ? [grudgeEv] : []);
         w.startEvent = ev.id;
       }
     }
@@ -900,6 +906,21 @@ export function sysFactions() {
     ensureBlocLeader(b);
   }
 
+  /* reclusive doctrine sects occasionally slip away from blocs they were swept into */
+  for (const b of aliveBlocs()) {
+    b.memberSects = b.memberSects.filter(sid => {
+      const s = STATE.sects.find(x => x.id === sid);
+      if (!s || !s.alive) return true;
+      if (DOCTRINES[s.doctrine]?.blocResist && chance(.07)) {
+        chron("c-faction",
+          `${sref(s)} — true to its reclusive ways — withdraws from ${bref(b)}, returning to the mountain silence it prefers to oaths.`,
+          "normal", [], [s.id]);
+        return false;
+      }
+      return true;
+    });
+  }
+
   /* the great war between the blocs — a clash of banners */
   const A = allianceBloc(), C = cultBloc();
   if (A && C && chance(.4)) {
@@ -1110,7 +1131,8 @@ export function sysIdeology() {
 
     /* doctrinal debt — a righteous house that survived by harbouring forbidden
        power must one day reckon with it: purge (if it still has the standing) or schism */
-    if (s.align === "orthodox" && s.doctrinalDebt >= 24 && chance(.3)) {
+    const docPurge = DOCTRINES[s.doctrine]?.purgeThreshold || 0;
+    if (s.align === "orthodox" && s.doctrinalDebt >= (24 + docPurge) && chance(.3)) {
       const tainted = living.filter(f => f.align !== "orthodox" || f.alignmentDrift > 45)
                             .sort((a, b) => b.alignmentDrift - a.alignmentDrift);
       if (s.legitimacy >= 45 && tainted.length) {
@@ -1171,7 +1193,17 @@ export function sysPatronage() {
 }
 
 export function sysGrudgeDecay() {
-  for (const f of aliveFigs()) decayGrudges(f);
+  for (const f of aliveFigs()) {
+    const doc = f.sect ? DOCTRINES[f.sect.doctrine] : null;
+    /* bloodthirsty and wrathful houses treat every grudge as a blood debt */
+    if (doc?.bloodGrudge) {
+      for (const tid of f.grudges) {
+        if (f.grudgeMeta[tid]) f.grudgeMeta[tid].blood = true;
+      }
+    }
+    /* wrathful houses: nothing fades. bloodGrudge alone is enough (blood grudges never decay). */
+    if (!doc?.noForgive) decayGrudges(f);
+  }
 }
 
 export function tick() {

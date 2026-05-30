@@ -73,6 +73,96 @@ export const REGION_TERRAIN = {
   "the Bleak Steppe":"frontier"
 };
 export const IMPERIAL_REGION = "the Imperial Capital";
+
+/*
+  Sect doctrines — the deep personality of a house, set at founding and
+  never changed. Colours how it fights, remembers slights, refines its
+  arts, and how the chronicle describes its deeds.
+*/
+export const DOCTRINES = {
+  bloodthirsty: {
+    label: "Bloodthirsty", kr: "살도",
+    tagline: "War is the only sermon it preaches.",
+    warVerb: "falls upon",
+    warMod: +0.18, killMod: +0.25, artBonus: 0, talentBonus: 0,
+    legitBonus: -6, bloodGrudge: true, noForgive: false, blocResist: false,
+    purgeThreshold: 0, c: "var(--blood)"
+  },
+  wrathful: {
+    label: "Wrathful", kr: "원한",
+    tagline: "Forgets nothing. Forgives nothing.",
+    warVerb: "descends in fury upon",
+    warMod: +0.10, killMod: +0.10, artBonus: 0, talentBonus: 0,
+    legitBonus: 0, bloodGrudge: true, noForgive: true, blocResist: false,
+    purgeThreshold: 0, c: "#c84040"
+  },
+  scheming: {
+    label: "Scheming", kr: "음모",
+    tagline: "Every alliance is a trap half-sprung.",
+    warVerb: "springs its trap on",
+    warMod: -0.05, killMod: -0.08, artBonus: 0, talentBonus: 0,
+    legitBonus: +5, bloodGrudge: false, noForgive: false, blocResist: false,
+    purgeThreshold: 0, c: "#9040c0"
+  },
+  honourable: {
+    label: "Honourable", kr: "의협",
+    tagline: "The oath above breathing.",
+    warVerb: "draws its blade — with heavy heart — against",
+    warMod: -0.08, killMod: -0.25, artBonus: 0, talentBonus: 0,
+    legitBonus: +14, bloodGrudge: false, noForgive: false, blocResist: false,
+    purgeThreshold: 0, c: "var(--jade)"
+  },
+  fanatical: {
+    label: "Fanatical", kr: "광신",
+    tagline: "Purity or death. No in-between.",
+    warVerb: "wages holy war upon",
+    warMod: +0.08, killMod: +0.10, artBonus: +0.08, talentBonus: 0,
+    legitBonus: +8, bloodGrudge: false, noForgive: false, blocResist: false,
+    purgeThreshold: -8, c: "#e05820"
+  },
+  reclusive: {
+    label: "Reclusive", kr: "은거",
+    tagline: "The mountain does not seek the valley.",
+    warVerb: "finally driven from its mountain, turns on",
+    warMod: -0.15, killMod: 0, artBonus: +0.18, talentBonus: +10,
+    legitBonus: +5, bloodGrudge: false, noForgive: false, blocResist: true,
+    purgeThreshold: 0, c: "var(--eunja)"
+  },
+  ambitious: {
+    label: "Ambitious", kr: "야망",
+    tagline: "Heaven itself is not enough.",
+    warVerb: "makes its move against",
+    warMod: +0.10, killMod: 0, artBonus: 0, talentBonus: 0,
+    legitBonus: 0, bloodGrudge: false, noForgive: false, blocResist: false,
+    purgeThreshold: 0, c: "var(--sapa)"
+  },
+  mercenary: {
+    label: "Mercenary", kr: "용병",
+    tagline: "Strength is the only principle.",
+    warVerb: "turns its blades against",
+    warMod: 0, killMod: 0, artBonus: 0, talentBonus: 0,
+    legitBonus: -8, bloodGrudge: false, noForgive: false, blocResist: false,
+    purgeThreshold: 0, c: "#708898"
+  },
+  scholarly: {
+    label: "Scholarly", kr: "학문",
+    tagline: "The art outlasts the blade.",
+    warVerb: "is forced from its libraries against",
+    warMod: -0.12, killMod: -0.15, artBonus: +0.20, talentBonus: +5,
+    legitBonus: +6, bloodGrudge: false, noForgive: false, blocResist: false,
+    purgeThreshold: 0, c: "#4080c0"
+  },
+  devout: {
+    label: "Devout", kr: "독실",
+    tagline: "The Path is marrow, not opinion.",
+    warVerb: "fights for the true Path against",
+    warMod: +0.05, killMod: 0, artBonus: +0.10, talentBonus: 0,
+    legitBonus: +10, bloodGrudge: false, noForgive: false, blocResist: false,
+    purgeThreshold: 0, c: "#c8a030"
+  }
+};
+export const DOCTRINE_KEYS = Object.keys(DOCTRINES);
+
 export const WAR_NAMES = [
   ["the Great Orthodox-Demon War","정마대전"],["the Blood Calamity","무림혈겁"],
   ["the Ten-Year War","십년대전"],["the Struggle for Supremacy","천하쟁패"],

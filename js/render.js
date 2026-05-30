@@ -1,5 +1,5 @@
 import { clamp, cap } from './rng.js';
-import { ALIGN, REALMS, REALM_KR } from './data.js';
+import { ALIGN, REALMS, REALM_KR, DOCTRINES } from './data.js';
 import { STATE, aliveFigs, aliveSects, figById } from './state.js';
 import { sectMight, topMember } from './systems.js';
 import { aliveBlocs, blocById, sectBloc, stanceLabel } from './factions.js';
@@ -232,6 +232,7 @@ export function renderPanels() {
       ${lead ? `<div class="sect-meta"><span>Head: <b>${leadName}</b> · ${STATE.showHangul ? REALM_KR[lead.realm] : REALMS[lead.realm]}</span></div>` : ""}
       ${sb ? `<div class="sect-bloc" style="--bc:${ALIGN[sb.align].c}">${blocTag}</div>` : ""}
       ${s.alive && s.align === "unorthodox" ? `<div class="sect-stance">↔ ${stanceLabel(s.stance)}</div>` : ""}
+      ${s.doctrine && DOCTRINES[s.doctrine] ? `<div class="doctrine-badge" style="color:${DOCTRINES[s.doctrine].c};border-color:${DOCTRINES[s.doctrine].c}">${DOCTRINES[s.doctrine].label}</div>` : ""}
       <div class="pbar"><i style="width:${clamp(s.prestige,0,100)}%"></i></div>
     `);
     sl.appendChild(div);

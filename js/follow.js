@@ -1,5 +1,5 @@
 import { cap, clamp } from './rng.js';
-import { ALIGN, REALMS, REALM_KR, TERRAIN } from './data.js';
+import { ALIGN, REALMS, REALM_KR, TERRAIN, DOCTRINES } from './data.js';
 import { STATE, figById, regionByName } from './state.js';
 import { bloodGrudges } from './bloodlines.js';
 import { stanceLabel } from './factions.js';
@@ -245,6 +245,13 @@ export function buildSectDossier(s) {
   h += `<span class="dos-badge ${s.alive ? 'dos-alive' : 'dos-dead'}">${s.alive ? '● Active' : '✦ Dissolved'}</span>`;
   h += `</div>`;
   const reg = regionByName(s.region);
+  const doc = s.doctrine ? DOCTRINES[s.doctrine] : null;
+  if (doc) {
+    h += `<div class="dos-doctrine" style="--dc:${doc.c}">`;
+    h += `<span class="doctrine-name" style="color:${doc.c}">${doc.label} <span class="dos-kr">${doc.kr}</span></span>`;
+    h += `<span class="doctrine-tagline">${doc.tagline}</span>`;
+    h += `</div>`;
+  }
   h += `<div class="dos-meta">Founded Year ${s.founded}${!s.alive && s.deadYear ? ` · Dissolved Year ${s.deadYear}` : ''} · ${s.region}${reg ? ` · ${TERRAIN[reg.terrain].label}` : ''}</div>`;
   h += `<div class="dos-meta">Prestige ${Math.round(s.prestige)} · Legitimacy ${Math.round(s.legitimacy)} · ${living.length} living disciples · ${s.allMembers.length} total</div>`;
   if (reg) {

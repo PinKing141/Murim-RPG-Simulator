@@ -895,6 +895,35 @@ button.ctl.primary:hover {
 .vrow b { font-weight: 500; color: var(--ink); text-align: right; font-size: 9.5px; }
 
 /* ================================================================
+   SECT DOCTRINE BADGE + DOSSIER BLOCK
+   ================================================================ */
+
+.doctrine-badge {
+  display: inline-block; font-family: 'Cinzel', serif; font-size: 9px;
+  letter-spacing: .1em; text-transform: uppercase;
+  border: 1px solid; border-radius: 2px; padding: 1px 7px;
+  opacity: .82; margin-top: 5px;
+}
+
+.dos-doctrine {
+  margin: 5px 0 8px; padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--dc, var(--gold-dim)) 40%, var(--line));
+  border-left: 3px solid var(--dc, var(--gold-dim));
+  border-radius: 3px;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--dc, var(--gold-dim)) 8%, var(--paper-3)),
+    var(--paper-3));
+}
+.doctrine-name {
+  font-family: 'Cinzel', serif; font-size: 11px;
+  letter-spacing: .08em; display: block; margin-bottom: 3px;
+}
+.doctrine-tagline {
+  font-family: 'Cormorant Garamond', serif; font-size: 13.5px;
+  font-style: italic; color: var(--ink-dim); display: block; line-height: 1.3;
+}
+
+/* ================================================================
    INLINE CAUSE SURFACING
    ================================================================ */
 

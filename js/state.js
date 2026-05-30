@@ -2,7 +2,7 @@ import { rand, ri, pick, chance, clamp } from './rng.js';
 import {
   SURNAMES, CLAN_SURNAMES, GIVEN,
   BH_PRE, BH_SUF, SECT_PRE, SECT_SUF, ART_PRE, ART_SUF,
-  REGIONS, TERRAIN, REGION_TERRAIN
+  REGIONS, TERRAIN, REGION_TERRAIN, DOCTRINES, DOCTRINE_KEYS
 } from './data.js';
 
 export const STATE = {
@@ -125,10 +125,13 @@ export function makeFigure(opts = {}) {
 export function makeSect(opts = {}) {
   const align = opts.align || pick(["orthodox","orthodox","orthodox","unorthodox","demonic","recluse"]);
   const nm = makeSectName(align);
+  const doctrine = opts.doctrine || pick(DOCTRINE_KEYS);
+  const doc = DOCTRINES[doctrine];
   return {
     id: newId(), kind: "sect",
     name: nm.en, kr: nm.kr, roman: nm.roman,
     align,
+    doctrine,
     region: opts.region || pick(REGIONS),
     founded: STATE.year,
     prestige: opts.prestige != null ? opts.prestige : ri(25, 55),
@@ -138,23 +141,16 @@ export function makeSect(opts = {}) {
     alive: true, deadYear: null,
     fallEvent: null,
     atWarWith: [],
-    /* the unorthodox middle — a sect's standing posture in bloc politics.
-       stance runs -100 (firmly cult-leaning) … 0 (stubbornly neutral) …
-       +100 (firmly alliance-leaning). Only meaningful for 사파 sects. */
     stance: opts.stance != null ? opts.stance : (align === "unorthodox" ? ri(-25, 25) : 0),
-    blocGrudges: [],          // institutional memory: [{blocId, blocType, reason, event, year}]
-    coerced: false,           // strong-armed into its current bloc?
+    blocGrudges: [],
+    coerced: false,
     joinedBlocYear: null,
     loyalYears: 0,
-    marriedOrthodox: false,   // has it intermarried into an orthodox house?
-    /* institutional authority, separate from power. Lets weak-but-legitimate
-       houses outlast strong-but-illegitimate ones. */
-    legitimacy: opts.legitimacy != null ? opts.legitimacy : ri(35, 62),
-    /* ideological strain: debt accrued by surviving through forbidden means,
-       and pressure from non-conformist disciples the doctrine can't contain. */
+    marriedOrthodox: false,
+    legitimacy: opts.legitimacy != null ? opts.legitimacy : clamp(ri(35, 62) + (doc ? doc.legitBonus : 0), 5, 92),
     doctrinalDebt: 0,
     reformLean: 0,
-    patron: false             // accepted imperial court patronage?
+    patron: false
   };
 }
 
