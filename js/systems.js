@@ -16,6 +16,13 @@ import { eraIndex } from './metrics.js';
 /* nudge a sect's institutional authority, kept in bounds */
 function legit(s, d) { if (s) s.legitimacy = clamp(s.legitimacy + d, 0, 100); }
 
+/* behavioral doctrine: head personality drives day-to-day conduct;
+   fall back to founding doctrine only if the seat is empty */
+function headDoc(s) {
+  const head = s.headId ? figById(s.headId) : null;
+  return (head && head.alive) ? DOCTRINES[head.personality] : DOCTRINES[s.doctrine];
+}
+
 /* era-aware contextual phrase for embedding in chronicle entries */
 function eraTone() {
   const era = eraIndex();
@@ -212,7 +219,7 @@ function battle(A, B, pa, pb, w) {
   const winner = pa >= pb ? A : B, loser = pa >= pb ? B : A;
   const slayer = topMember(winner);
   const victims = loser.members.map(figById).filter(x => x && x.alive);
-  const killP = clamp(0.6 + (DOCTRINES[winner.doctrine]?.killMod || 0), 0.1, 0.95);
+  const killP = clamp(0.6 + (headDoc(winner)?.killMod || 0), 0.1, 0.95);
   if (victims.length > 1 && chance(killP)) {
     const v = pick(victims.sort((x, y) => x.power - y.power).slice(0, Math.ceil(victims.length / 2)));
     if (v) killFigure(v, `falls in battle during ${w.name} (${w.kr})`, w.startEvent != null ? [w.startEvent] : [], slayer ? slayer.id : null);
@@ -351,8 +358,8 @@ export function sysRivalryAndWar() {
     const a = pick(sects); let b = pick(sects); let g = 0; while (b === a && g++ < 5) b = pick(sects);
     if (a !== b && !warExists(a, b)) {
       const enemyPaths = (a.align === "demonic" && b.align === "orthodox") || (a.align === "orthodox" && b.align === "demonic");
-      const aDoc = DOCTRINES[a.doctrine], bDoc = DOCTRINES[b.doctrine];
-      const warP = 0.22 + (aDoc?.warMod || 0) + (bDoc?.warMod || 0) * 0.5;
+      const aHead = headDoc(a), bHead = headDoc(b);
+      const warP = 0.22 + (aHead?.warMod || 0) + (bHead?.warMod || 0) * 0.5;
       if (enemyPaths || chance(warP)) {
         const wn = pick(WAR_NAMES);
         const w = { a: a.id, b: b.id, name: wn[0], kr: wn[1], years: 0, start: STATE.year, startEvent: null };
@@ -363,8 +370,8 @@ export function sysRivalryAndWar() {
           enemyPaths ? "the orthodox cannot abide the demonic" :
           pick(["a stolen manual","an assassinated elder","a contested mountain","an old blood-debt","a marriage betrayed","a duel gone wrong"]);
         const eraSuffix = STATE.activeWars.length >= 2 ? `, ${eraTone()}` : '';
-        const warLine = aDoc?.warVerb
-          ? `${sref(a)} ${aDoc.warVerb} ${sref(b)} — ${w.name} (${w.kr}) — over ${cause}${eraSuffix}.`
+        const warLine = aHead?.warVerb
+          ? `${sref(a)} ${aHead.warVerb} ${sref(b)} — ${w.name} (${w.kr}) — over ${cause}${eraSuffix}.`
           : `${pick(["Banners rise","War drums sound","Blood is sworn"])}: ${sref(a)} and ${sref(b)} fall into open war — ${w.name} (${w.kr}) — over ${cause}${eraSuffix}.`;
         const ev = chron("c-war", warLine, "major", [], [a.id, b.id], grudgeEv != null ? [grudgeEv] : []);
         w.startEvent = ev.id;
@@ -1194,15 +1201,50 @@ export function sysPatronage() {
 
 export function sysGrudgeDecay() {
   for (const f of aliveFigs()) {
-    const doc = f.sect ? DOCTRINES[f.sect.doctrine] : null;
-    /* bloodthirsty and wrathful houses treat every grudge as a blood debt */
-    if (doc?.bloodGrudge) {
+    /* behavior driven by the figure's own personality, not the sect's founding doctrine */
+    const pDoc = DOCTRINES[f.personality];
+    /* bloodthirsty and wrathful personalities treat every grudge as a blood debt */
+    if (pDoc?.bloodGrudge) {
       for (const tid of f.grudges) {
         if (f.grudgeMeta[tid]) f.grudgeMeta[tid].blood = true;
       }
     }
-    /* wrathful houses: nothing fades. bloodGrudge alone is enough (blood grudges never decay). */
-    if (!doc?.noForgive) decayGrudges(f);
+    /* wrathful personalities: nothing fades */
+    if (!pDoc?.noForgive) decayGrudges(f);
+  }
+}
+
+/* drama when a leader's personality clashes with the sect's founding doctrine */
+export function sysTension() {
+  for (const s of aliveSects()) {
+    if (!s.headId) continue;
+    const head = figById(s.headId);
+    if (!head || !head.alive) continue;
+    if (head.personality === s.doctrine) { s.tensionDebt = Math.max(0, s.tensionDebt - 2); continue; }
+    s.tensionDebt = (s.tensionDebt || 0) + 1;
+    if (s.tensionDebt < 4) continue;
+    const foundDoc = DOCTRINES[s.doctrine];
+    const headPers = DOCTRINES[head.personality];
+    if (!foundDoc || !headPers) continue;
+    const lines = [
+      `The elders of ${sref(s)} mutter in the cloisters: their house was built as a ${foundDoc.label} institution, yet ${ref(head)} rules it as though ${headPers.label.toLowerCase()} were the only scripture.`,
+      `${ref(head)} is not what ${sref(s)} was made for. The house's founding doctrine — ${foundDoc.label} — sits uneasily beside a head whose every action speaks of the ${headPers.label.toLowerCase()} path.`,
+      `Tension has settled like sediment in ${sref(s)}. The sect was a ${foundDoc.label} house; its head, ${ref(head)}, walks a ${headPers.label.toLowerCase()} road. The gap between them widens.`
+    ];
+    const ev = chron("c-doctrine", pick(lines), "normal", [head.id], [s.id], []);
+    s.tensionDebt = 0;
+    legit(s, -ri(3, 7));
+    /* after enough pressure, some members split off */
+    if (s.tensionDebt >= 3 && s.members.length >= 4 && chance(.3)) {
+      const splinter = s.members.map(figById).filter(f => f && f.alive && f.id !== s.headId);
+      if (splinter.length >= 2) {
+        const leader = splinter.sort((a, b) => b.power - a.power)[0];
+        chron("c-schism",
+          `Unable to reconcile the ${headPers.label.toLowerCase()} conduct of ${ref(head)} with the ${foundDoc.label} tradition they were raised in, ${ref(leader)} and a faction of ${sref(s)} break away to walk the old road in silence.`,
+          "major", [leader.id], [s.id], [ev.id]);
+        legit(s, -ri(5, 12));
+      }
+    }
   }
 }
 
@@ -1233,6 +1275,7 @@ export function tick() {
     sysBloodlineAwakening();
     sysEraCommentary();
     sysGrudgeDecay();
+    sysTension();
   }
   STATE.dirtyPanels = true;
 }

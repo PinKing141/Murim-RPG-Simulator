@@ -232,7 +232,15 @@ export function renderPanels() {
       ${lead ? `<div class="sect-meta"><span>Head: <b>${leadName}</b> · ${STATE.showHangul ? REALM_KR[lead.realm] : REALMS[lead.realm]}</span></div>` : ""}
       ${sb ? `<div class="sect-bloc" style="--bc:${ALIGN[sb.align].c}">${blocTag}</div>` : ""}
       ${s.alive && s.align === "unorthodox" ? `<div class="sect-stance">↔ ${stanceLabel(s.stance)}</div>` : ""}
-      ${s.doctrine && DOCTRINES[s.doctrine] ? `<div class="doctrine-badge" style="color:${DOCTRINES[s.doctrine].c};border-color:${DOCTRINES[s.doctrine].c}">${DOCTRINES[s.doctrine].label}</div>` : ""}
+      ${(() => {
+        const fd = s.doctrine && DOCTRINES[s.doctrine];
+        const headFig = s.headId ? figById(s.headId) : null;
+        const hp = headFig && headFig.alive && headFig.personality ? DOCTRINES[headFig.personality] : null;
+        let out = '';
+        if (fd) out += `<div class="doctrine-badge" style="color:${fd.c};border-color:${fd.c}" title="Founding doctrine">${fd.label}</div>`;
+        if (hp && hp !== fd) out += `<div class="doctrine-badge doctrine-badge-head" style="color:${hp.c};border-color:${hp.c}" title="Head personality">⚔ ${hp.label}</div>`;
+        return out;
+      })()}
       <div class="pbar"><i style="width:${clamp(s.prestige,0,100)}%"></i></div>
     `);
     sl.appendChild(div);
@@ -285,6 +293,7 @@ export function renderPanels() {
           <span>${lbl.ki}</span>${bar(f.alignmentDrift, 100, "var(--magyo)")}
         </div>
         ${f.art ? `<div class="fig-sub" style="margin-top:6px">${f.art.name} (${f.art.kr}) · tier ${f.art.tier}</div>` : ""}
+        ${(() => { const p = f.personality && DOCTRINES[f.personality]; return p ? `<div class="doctrine-badge doctrine-badge-fig" style="color:${p.c};border-color:${p.c}">${p.label}</div>` : ''; })()}
       `);
       fl.appendChild(div);
     }

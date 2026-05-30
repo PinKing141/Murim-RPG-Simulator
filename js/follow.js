@@ -246,10 +246,21 @@ export function buildSectDossier(s) {
   h += `</div>`;
   const reg = regionByName(s.region);
   const doc = s.doctrine ? DOCTRINES[s.doctrine] : null;
+  const head = s.headId ? figById(s.headId) : null;
+  const headPers = (head && head.alive && head.personality) ? DOCTRINES[head.personality] : null;
   if (doc) {
     h += `<div class="dos-doctrine" style="--dc:${doc.c}">`;
+    h += `<span class="doctrine-label">Founding Doctrine</span>`;
     h += `<span class="doctrine-name" style="color:${doc.c}">${doc.label} <span class="dos-kr">${doc.kr}</span></span>`;
     h += `<span class="doctrine-tagline">${doc.tagline}</span>`;
+    h += `</div>`;
+  }
+  if (headPers) {
+    const clash = headPers !== doc;
+    h += `<div class="dos-doctrine dos-head-pers${clash ? ' dos-tension' : ''}" style="--dc:${headPers.c}">`;
+    h += `<span class="doctrine-label">Current Head</span>`;
+    h += `<span class="doctrine-name" style="color:${headPers.c}">${headPers.label} <span class="dos-kr">${headPers.kr}</span></span>`;
+    h += `<span class="doctrine-tagline">${clash ? `Clash with founding soul — tension building.` : `Aligned with the sect's founding nature.`}</span>`;
     h += `</div>`;
   }
   h += `<div class="dos-meta">Founded Year ${s.founded}${!s.alive && s.deadYear ? ` · Dissolved Year ${s.deadYear}` : ''} · ${s.region}${reg ? ` · ${TERRAIN[reg.terrain].label}` : ''}</div>`;

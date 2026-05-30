@@ -163,6 +163,15 @@ export const DOCTRINES = {
 };
 export const DOCTRINE_KEYS = Object.keys(DOCTRINES);
 
+/* which personalities a given alignment tends to produce — not a hard rule,
+   just a weighted bias so demonic houses breed wrathful heads more often */
+export const ALIGN_PERSONALITY_BIAS = {
+  orthodox:   ["honourable","devout","scholarly","fanatical","reclusive","ambitious"],
+  unorthodox: ["scheming","mercenary","ambitious","wrathful","bloodthirsty","honourable"],
+  demonic:    ["bloodthirsty","wrathful","fanatical","ambitious","scheming","mercenary"],
+  recluse:    ["reclusive","scholarly","devout","honourable","scheming","wrathful"]
+};
+
 export const WAR_NAMES = [
   ["the Great Orthodox-Demon War","정마대전"],["the Blood Calamity","무림혈겁"],
   ["the Ten-Year War","십년대전"],["the Struggle for Supremacy","천하쟁패"],

@@ -904,6 +904,8 @@ button.ctl.primary:hover {
   border: 1px solid; border-radius: 2px; padding: 1px 7px;
   opacity: .82; margin-top: 5px;
 }
+.doctrine-badge-head { opacity: 1; font-weight: 600; margin-left: 4px; }
+.doctrine-badge-fig  { opacity: .75; }
 
 .dos-doctrine {
   margin: 5px 0 8px; padding: 7px 10px;
@@ -913,6 +915,17 @@ button.ctl.primary:hover {
   background: linear-gradient(135deg,
     color-mix(in srgb, var(--dc, var(--gold-dim)) 8%, var(--paper-3)),
     var(--paper-3));
+}
+.dos-tension {
+  border-left-color: var(--blood);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--blood) 10%, var(--paper-3)),
+    var(--paper-3));
+}
+.doctrine-label {
+  font-family: 'Cinzel', serif; font-size: 9px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ink-dim); display: block; margin-bottom: 3px;
+  opacity: .7;
 }
 .doctrine-name {
   font-family: 'Cinzel', serif; font-size: 11px;
@@ -942,6 +955,11 @@ button.ctl.primary:hover {
 .entry.c-era .txt {
   font-style: italic; color: var(--ink-dim); font-size: 16px;
   border-left: 2px solid rgba(200,149,42,.2); padding-left: 10px; margin-left: -10px;
+}
+.c-doctrine { --dot: #9040c0; }
+.entry.c-doctrine .txt {
+  font-style: italic; border-left: 2px solid rgba(144,64,192,.25);
+  padding-left: 10px; margin-left: -10px;
 }
 
 /* ================================================================

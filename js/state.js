@@ -2,7 +2,7 @@ import { rand, ri, pick, chance, clamp } from './rng.js';
 import {
   SURNAMES, CLAN_SURNAMES, GIVEN,
   BH_PRE, BH_SUF, SECT_PRE, SECT_SUF, ART_PRE, ART_SUF,
-  REGIONS, TERRAIN, REGION_TERRAIN, DOCTRINES, DOCTRINE_KEYS
+  REGIONS, TERRAIN, REGION_TERRAIN, DOCTRINES, DOCTRINE_KEYS, ALIGN_PERSONALITY_BIAS
 } from './data.js';
 
 export const STATE = {
@@ -91,10 +91,14 @@ export function makeFigure(opts = {}) {
     age: opts.age != null ? opts.age : ri(14, 22),
     lifespan: 0, power: 0,
     fame: opts.fame || ri(0, 8),
-    /* charisma — the gift of being followed. It is not strength; it is why
-       people swear oaths, raise you as 맹주, or forgive a thin claim. It feeds
-       fame, legitimacy, and bloc leadership rather than combat. */
     charisma: opts.charisma != null ? opts.charisma : clamp(ri(8, 64) + (clan ? 12 : 0), 0, 100),
+    /* personality — the deep character of this individual. Unlike alignment
+       (what path they walk), personality is how they walk it. A Bloodthirsty
+       figure seeks war; a Scholarly one seeks mastery; a Scheming one seeks
+       leverage. When they lead a sect it overrides the house's founding doctrine
+       as the driver of day-to-day behaviour. */
+    personality: opts.personality != null ? opts.personality
+      : (chance(.65) ? pick(ALIGN_PERSONALITY_BIAS[align] || DOCTRINE_KEYS) : pick(DOCTRINE_KEYS)),
     alignmentDrift: align === "demonic" ? ri(40,65) : align === "unorthodox" ? ri(20,40) : ri(0,15),
     sect: opts.sect || null,
     art: opts.art || null,
@@ -150,7 +154,8 @@ export function makeSect(opts = {}) {
     legitimacy: opts.legitimacy != null ? opts.legitimacy : clamp(ri(35, 62) + (doc ? doc.legitBonus : 0), 5, 92),
     doctrinalDebt: 0,
     reformLean: 0,
-    patron: false
+    patron: false,
+    tensionDebt: 0   // accumulated when head personality clashes with founding doctrine
   };
 }
 

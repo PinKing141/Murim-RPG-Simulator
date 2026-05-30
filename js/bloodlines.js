@@ -1,5 +1,5 @@
 import { ri, pick, chance, clamp } from './rng.js';
-import { GIVEN } from './data.js';
+import { GIVEN, DOCTRINE_KEYS, ALIGN_PERSONALITY_BIAS } from './data.js';
 import { STATE, figById, makeFigure, addToSect, recomputePower } from './state.js';
 
 /* How long a non-blood grudge (a duel, a slight) lingers before it fades.
@@ -150,8 +150,11 @@ export function makeChild(pA, pB) {
   const sect = (carrier.sect && carrier.sect.alive) ? carrier.sect
     : (other.sect && other.sect.alive) ? other.sect : null;
 
-  /* the gift of presence runs in the blood as surely as talent does */
   const charisma = clamp(Math.round((pA.charisma + pB.charisma) / 2 + ri(-12, 12)), 0, 100);
+
+  /* personality: 50% chance to inherit from one parent, otherwise fresh roll biased by align */
+  const personality = chance(.5) ? (chance(.5) ? pA.personality : pB.personality)
+    : (chance(.65) ? pick(ALIGN_PERSONALITY_BIAS[align] || DOCTRINE_KEYS) : pick(DOCTRINE_KEYS));
 
   const child = makeFigure({
     name, clan, align,
@@ -160,7 +163,8 @@ export function makeChild(pA, pB) {
     parents: [pA.id, pB.id],
     gen: Math.max(pA.gen, pB.gen) + 1,
     bloodlineTaint: taint,
-    taintSource
+    taintSource,
+    personality
   });
 
   /* the family manual passes down the blood */
