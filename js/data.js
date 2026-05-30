@@ -216,7 +216,15 @@ export function artAffinity(f, art) {
    "never"       → orthodox/recluse arts: inert; misuse is the wielder's sin */
 export function artCorruptType(art) {
   if (!art) return "never";
-  if (art.align === "demonic")    return "always";
+  if (art.align === "demonic") return "always";
+  /* an art whose practice has darkened enough — regardless of original text —
+     can develop corrupting side effects. The lineage is what matters. */
+  if (art.currentInterpretation) {
+    const agg = art.currentInterpretation.aggression || 0;
+    const mer = art.currentInterpretation.mercy     || 100;
+    if (art.align === "unorthodox" && agg > 72 && mer < 22) return "always";
+    if (art.align === "orthodox"   && agg > 68 && mer < 20 && art.deviationScore > 50) return "conditional";
+  }
   if (art.align === "unorthodox") return "conditional";
   return "never";
 }
@@ -240,11 +248,100 @@ export const REALM_KR  = ["삼류","이류","일류","절정","초절정","화�
 export const APEX      = REALMS.length - 1;
 
 export const PATH_FLAVOR = {
-  orthodox:  { verb:"attained",      via:["through disciplined meditation","by tempering the heart against desire","following the righteous canon","after a decade of ascetic refinement"] },
-  unorthodox:{ verb:"forced open",   via:["by absorbing a rival's naegong","through ingenious but forbidden shortcuts","at the cost of a shortened life","with a pill of dubious origin"] },
-  demonic:   { verb:"seized",        via:["by devouring the energy of the slain","through the blood of a hundred enemies","at the price of their remaining humanity","by feeding the demonic art within"] },
+  orthodox:  { verb:"attained",       via:["through disciplined meditation","by tempering the heart against desire","following the righteous canon","after a decade of ascetic refinement"] },
+  unorthodox:{ verb:"forced open",    via:["by absorbing a rival's naegong","through ingenious but forbidden shortcuts","at the cost of a shortened life","with a pill of dubious origin"] },
+  demonic:   { verb:"seized",         via:["by devouring the energy of the slain","through the blood of a hundred enemies","at the price of their remaining humanity","by feeding the demonic art within"] },
   recluse:   { verb:"quietly reached",via:["in solitude upon a nameless peak","having forgotten the affairs of men","while listening to the mountain rain","after a lifetime of stillness"] }
 };
+
+/* ============================================================
+   ART TRADITION — principles, interpretation, commentary
+   ============================================================ */
+
+/* the five axes of any martial tradition */
+export const ART_PRINCIPLES = ["patience","aggression","mercy","discipline","sacrifice"];
+
+/* how a tradition is seeded depending on alignment ([lo, hi] per axis) */
+export const ALIGN_PRINCIPLES = {
+  orthodox:   { patience:[55,85], aggression:[10,30], mercy:[60,85], discipline:[60,85], sacrifice:[15,35] },
+  unorthodox: { patience:[30,60], aggression:[35,65], mercy:[25,55], discipline:[25,55], sacrifice:[35,65] },
+  demonic:    { patience:[10,30], aggression:[70,95], mercy:[ 5,20], discipline:[30,65], sacrifice:[55,85] },
+  recluse:    { patience:[70,90], aggression:[ 5,20], mercy:[55,80], discipline:[50,75], sacrifice:[20,45] }
+};
+
+/* how each personality nudges interpretation when they practice */
+export const PERSONALITY_PRINCIPLE_BIAS = {
+  bloodthirsty: { patience:-1, aggression:+3, mercy:-3, discipline: 0, sacrifice:+1 },
+  wrathful:     { patience:-1, aggression:+2, mercy:-2, discipline:-1, sacrifice:+1 },
+  scheming:     { patience:+1, aggression:+1, mercy:-1, discipline:+1, sacrifice: 0 },
+  honourable:   { patience:+1, aggression:-2, mercy:+2, discipline:+2, sacrifice: 0 },
+  fanatical:    { patience: 0, aggression:+1, mercy:-2, discipline:+3, sacrifice:+1 },
+  reclusive:    { patience:+3, aggression:-2, mercy:+1, discipline:+1, sacrifice:-1 },
+  ambitious:    { patience:-1, aggression:+1, mercy:-1, discipline:-1, sacrifice:+1 },
+  mercenary:    { patience:-1, aggression:+1, mercy:-2, discipline: 0, sacrifice:+2 },
+  scholarly:    { patience:+2, aggression:-1, mercy:+1, discipline:+2, sacrifice:-1 },
+  devout:       { patience:+1, aggression:-2, mercy:+2, discipline:+2, sacrifice: 0 }
+};
+
+/* commentary text pools keyed by which axis drifted most and which direction */
+export const ART_COMMENTARY = {
+  aggression_up: [
+    "The founder's restraint was wisdom for their time. These hands have known blood. I have amended the third form accordingly.",
+    "Mercy is a choice. In the killing ground, choice is death. I do not think the founder would disagree, had they lived as I have.",
+    "The breathing exercises slow the strike. I have removed them from daily practice."
+  ],
+  aggression_down: [
+    "The lineage has grown too fond of the blade's edge. I am returning to the first principles — patience is the deeper weapon.",
+    "What my teacher called aggression, I call desperation. I have written a corrective commentary on the fourth section.",
+    "The art was always about flow. Somewhere, we forgot this. I am restoring it."
+  ],
+  mercy_up: [
+    "It is easier to end a life than to spare one wisely. The art should teach the harder path.",
+    "I disagreed with my master on the final form. I have recorded my reasoning here.",
+    "The killing art need not be killing at every moment. I have added a section on restraint to the third chapter."
+  ],
+  mercy_down: [
+    "Sentiment is a wound that does not close. I have removed the forms designed to disable rather than kill.",
+    "My teacher was soft. I love their memory and have corrected their error.",
+    "The art asks us to be instruments. An instrument does not hesitate."
+  ],
+  discipline_up: [
+    "Three generations of improvisation have left this art unrecognisable. I have returned to the original scaffold.",
+    "Freedom without foundation is chaos. I have codified the twenty-two essential movements.",
+    "The variations that entered the lineage are indulgent. I am publishing a standardised form."
+  ],
+  discipline_down: [
+    "The codified form was never the art. It was a map. I am teaching navigation, not memorisation.",
+    "Rigidity killed my master's senior disciple. I have rewritten the fourth section to allow for variation.",
+    "The old masters were geniuses. Their students should not be required to be."
+  ],
+  patience_up: [
+    "Haste is the enemy of depth. I have restored the meditative components my predecessors discarded.",
+    "Speed is a symptom. The cause is stillness. I am correcting the emphasis.",
+    "The art contains layers that only reveal themselves after years. I have noted where to look."
+  ],
+  patience_down: [
+    "The old forms assume a lifetime of preparation. The Gangho does not grant lifetimes. I have condensed.",
+    "Patience is a luxury of the peaceful. I have adapted the technique for those who do not have it.",
+    "My teacher meditated for three years before teaching the second form. I do not have the luxury. Neither do my students."
+  ],
+  sacrifice_up: [
+    "The art will ask everything. That is not a flaw — it is the gate through which mastery passes.",
+    "My predecessors softened the cost. I am restoring it. The technique was never meant to be comfortable.",
+    "What the founder called foundation, I understand now as surrender. I have added this reading to chapter one."
+  ],
+  sacrifice_down: [
+    "The method does not require you to destroy yourself to use it. I have found a more sustainable path.",
+    "The old way burned through practitioners in twenty years. I have rebalanced the inner circulation.",
+    "A technique only the suicidally committed can use is not a technique — it is an ordeal. I have simplified it."
+  ]
+};
+
+/* modifiers for branch variant names */
+export const ART_BRANCH_NAMES = [
+  ["Void","허"], ["Shadow","영"], ["Broken","파"], ["Storm","풍"], ["Iron","철"],
+  ["Hidden","은"], ["Pure","정"], ["Ascendant","승"], ["Fallen","락"], ["Fractured","열"]
+];
 
 /* ---------------- legendary relics ---------------- */
 

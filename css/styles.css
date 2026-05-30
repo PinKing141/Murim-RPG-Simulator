@@ -590,6 +590,64 @@ button.ctl.primary:hover {
 .dos-empty { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: var(--ink-faint); padding: 4px 0; }
 
 /* ================================================================
+   ART LIVING TRADITION PANEL
+   ================================================================ */
+.art-tradition {
+  margin: 6px 0 10px; padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--azure) 25%, var(--line));
+  border-left: 3px solid color-mix(in srgb, var(--azure) 55%, transparent);
+  border-radius: 3px;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--azure) 5%, var(--paper-3)), var(--paper-3));
+}
+.art-trad-hd {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 7px; flex-wrap: wrap;
+}
+.art-trad-label {
+  font-family: 'Cinzel', serif; font-size: 9px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ink-faint); opacity: .8;
+}
+.art-trad-dev  { font-family: 'Cinzel', serif; font-size: 10px; font-weight: 600; }
+.art-trad-parent { font-size: 11px; color: var(--ink-dim); }
+
+.art-prin-grid { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; }
+.ap-row { display: grid; grid-template-columns: 72px 1fr 34px; align-items: center; gap: 6px; }
+.ap-key {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--ink-faint); text-align: right;
+}
+.ap-track {
+  position: relative; height: 5px; background: var(--line-2); border-radius: 3px; overflow: visible;
+}
+.ap-fill {
+  position: absolute; top: 0; left: 0; bottom: 0; border-radius: 3px;
+  transition: width .3s; opacity: .75;
+}
+.ap-founder-mark {
+  position: absolute; top: -2px; bottom: -2px; width: 2px;
+  background: var(--gold-dim); opacity: .6; border-radius: 1px;
+  transform: translateX(-50%);
+}
+.ap-delta {
+  font-family: 'JetBrains Mono', monospace; font-size: 9.5px;
+  text-align: right; font-weight: 600;
+}
+
+.art-commentaries {
+  margin-top: 7px; padding-top: 6px;
+  border-top: 1px solid rgba(255,255,255,.04);
+}
+.art-comment {
+  padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.03);
+  font-family: 'Cormorant Garamond', serif; font-size: 13.5px; line-height: 1.35;
+}
+.ac-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--ink-faint);
+  letter-spacing: .04em;
+}
+.ac-text { color: var(--ink); font-style: italic; }
+
+/* ================================================================
    OBITUARY
    ================================================================ */
 
@@ -740,7 +798,9 @@ button.ctl.primary:hover {
 .chain-row.c-faction     { --dot: var(--gold-bright); }
 .chain-row.c-schism      { --dot: #c84030; }
 .chain-row.c-region      { --dot: #4a9858; }
-.chain-row.c-relic       { --dot: #d0a838; }
+.chain-row.c-relic            { --dot: #d0a838; }
+.chain-row.c-art-commentary   { --dot: #9048c8; }
+.chain-row.c-art-breakthrough { --dot: #d0a838; }
 .chain-row.c-tourney     { --dot: var(--azure); }
 .chain-row.c-assassin    { --dot: #a02828; }
 .chain-row.c-hermit      { --dot: var(--eunja); }
@@ -975,6 +1035,10 @@ button.ctl.primary:hover {
 .entry.c-corruption .txt {
   border-left: 2px solid rgba(181,42,32,.3); padding-left: 10px; margin-left: -10px;
 }
+.c-art-commentary { --dot: #9048c8; }
+.entry.c-art-commentary .txt { font-style: italic; }
+.entry.c-art-commentary .txt .ac-inline { color: var(--ink); font-style: italic; }
+.c-art-breakthrough { --dot: #d0a838; }
 .c-affinity { --dot: var(--jade); }
 .entry.c-affinity .txt {
   border-left: 2px solid rgba(13,138,96,.25); padding-left: 10px; margin-left: -10px;

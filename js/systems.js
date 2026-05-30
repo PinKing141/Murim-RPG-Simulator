@@ -1,6 +1,6 @@
 import { rand, ri, pick, chance, clamp, cap } from './rng.js';
-import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN, TERRAIN, REGION_TERRAIN, IMPERIAL_REGION, DOCTRINES, artAffinity, artCorruptType, TOURNEY_NAMES, RELIC_DEEDS } from './data.js';
-import { STATE, aliveFigs, aliveSects, figById, makeFigure, makeSect, addToSect, recomputeLife, recomputePower, makeByeolho, regionByName, makeRelic, relicById } from './state.js';
+import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN, TERRAIN, REGION_TERRAIN, IMPERIAL_REGION, DOCTRINES, artAffinity, artCorruptType, TOURNEY_NAMES, RELIC_DEEDS, PERSONALITY_PRINCIPLE_BIAS, ART_PRINCIPLES, ART_COMMENTARY, ART_BRANCH_NAMES } from './data.js';
+import { STATE, aliveFigs, aliveSects, figById, makeFigure, makeArt, makeSect, addToSect, recomputeLife, recomputePower, makeByeolho, regionByName, makeRelic, relicById } from './state.js';
 import { chron, ref, plainRef, sref, aref, bref, rref } from './chronicle.js';
 import {
   addGrudge, decayGrudges, bloodGrudges, dropGrudge, inheritGrudgesOnDeath,
@@ -231,6 +231,14 @@ export function dissolveSect(s, why, causes = []) {
   s.fallEvent = ev.id;
   if (s.signatureArt && s.signatureArt.holders <= 1 && chance(.5)) {
     loseArt(s.signatureArt, `buried in the ruin of ${s.name}`, [ev.id]);
+    /* a sect's fall often means knowledge is only partially preserved */
+    if (chance(.45) && s.signatureArt.founderPrinciples) {
+      s.signatureArt.isFragment = true;
+      const k = pick(ART_PRINCIPLES);
+      /* the lost section's knowledge regresses toward uncertainty (50) */
+      s.signatureArt.currentInterpretation[k] =
+        Math.round((s.signatureArt.currentInterpretation[k] + 50) / 2);
+    }
   }
   return ev;
 }
@@ -369,6 +377,127 @@ export function sysRecruitment() {
         chron("c-lineage",
           `A prodigy named ${plainRef(f)} is taken in by ${sref(s)}; the elders whisper of a rare innate root.`,
           "normal", [f.id], [s.id]);
+      }
+    }
+  }
+}
+
+/* ---- art evolution: interpretation drift, commentary, branches ---- */
+
+/* recompute how far a tradition's current practice is from its founder's intent */
+function artDeviationScore(a) {
+  if (!a.founderPrinciples || !a.currentInterpretation) return 0;
+  const total = ART_PRINCIPLES.reduce(
+    (t, k) => t + Math.abs((a.currentInterpretation[k] ?? 50) - (a.founderPrinciples[k] ?? 50)), 0);
+  return clamp(Math.round(total / ART_PRINCIPLES.length), 0, 100);
+}
+
+/* fork a new lineage branch from a parent art, seeded by the current interpretation */
+function spawnVariant(parentArt, founder, causeId = null) {
+  const branchLabel = pick(ART_BRANCH_NAMES);
+  /* the variant's alignment can slip if the practice has already darkened enough */
+  let variantAlign = parentArt.align;
+  if (parentArt.deviationScore > 60) {
+    const ci = parentArt.currentInterpretation;
+    if (parentArt.align === "orthodox"   && ci.aggression > 65 && ci.mercy < 25) variantAlign = "unorthodox";
+    if (parentArt.align === "unorthodox" && ci.aggression > 78 && ci.mercy < 15) variantAlign = "demonic";
+  }
+  const variant = makeArt(variantAlign);
+  variant.name = branchLabel[0] + " " + parentArt.name;
+  variant.kr   = branchLabel[1] + parentArt.kr;
+  /* the branch's founderPrinciples are the parent's current interpretation —
+     this generation's deviation becomes the next generation's orthodoxy */
+  variant.founderPrinciples      = { ...parentArt.currentInterpretation };
+  variant.currentInterpretation  = { ...parentArt.currentInterpretation };
+  variant.deviationScore = 0;
+  variant.parentId = parentArt.id;
+  variant.lastVariantAt = STATE.year;
+  variant.tier = Math.max(1, parentArt.tier + ri(-1, 1));
+  variant.holders = 1;
+  parentArt.holders = Math.max(0, parentArt.holders - 1);
+  parentArt.lastVariantAt = STATE.year;
+  founder.art = variant;
+  STATE.arts.push(variant);
+  const causes = causeId != null ? [causeId] : [];
+  chron("c-art",
+    `${ref(founder)}'s interpretation of ${aref(parentArt)} has diverged enough to stand as its own lineage — henceforth called <em class="art">${variant.name} (${variant.kr})</em>. The original tradition now carries a branch.`,
+    "major", [founder.id], [], causes);
+  return variant;
+}
+
+export function sysArtEvolution() {
+  for (const a of STATE.arts) {
+    if (a.lost || a.dormant || !a.founderPrinciples || !a.currentInterpretation) continue;
+
+    const holders = aliveFigs().filter(f => f.art === a);
+    if (!holders.length) continue;
+
+    /* aggregate personality pressure from every living practitioner */
+    const pressure = Object.fromEntries(ART_PRINCIPLES.map(k => [k, 0]));
+    for (const f of holders) {
+      const bias = PERSONALITY_PRINCIPLE_BIAS[f.personality];
+      if (!bias) continue;
+      for (const k of ART_PRINCIPLES) pressure[k] += (bias[k] || 0);
+    }
+
+    /* apply a small nudge per year; stored as float to avoid rounding to zero.
+       normalise by sqrt(holders) so large diverse sects drift slightly faster than
+       a lone practitioner, but not proportionally — one strong master shapes a
+       tradition more than a hundred mediocre disciples. */
+    for (const k of ART_PRINCIPLES) {
+      const norm     = Math.sqrt(Math.max(1, holders.length));
+      const nudge    = (pressure[k] / norm) * 0.15;
+      const restoring = (a.founderPrinciples[k] - a.currentInterpretation[k]) * 0.02;
+      a.currentInterpretation[k] = clamp(a.currentInterpretation[k] + nudge + restoring, 0, 100);
+    }
+    a.deviationScore = artDeviationScore(a);
+
+    /* commentary: written when a notable practitioner witnesses a clear drift.
+       Threshold kept low (12) so drift is visible early; min 14-year gap to avoid
+       flooding. Only fires when the art hasn't recently spawned a variant. */
+    if (a.deviationScore >= 12 && STATE.year - a.lastCommentaryAt >= 14 &&
+        STATE.year - a.lastVariantAt >= 4) {
+      const notable = holders.filter(f => f.realm >= 4 || f.namedAt != null);
+      /* prefer a named master but allow any notable — single authorship is boring */
+      const author = notable.length
+        ? (chance(.65) ? notable.sort((a,b) => b.realm - a.realm)[0] : pick(notable))
+        : (chance(.35) ? pick(holders) : null);
+      if (author) {
+        const drifts = ART_PRINCIPLES
+          .map(k => ({ k, d: a.currentInterpretation[k] - a.founderPrinciples[k] }))
+          .sort((x, y) => Math.abs(y.d) - Math.abs(x.d));
+        const top = drifts[0];
+        const dir = top.d > 0 ? "_up" : "_down";
+        const pool = ART_COMMENTARY[top.k + dir] || ART_COMMENTARY.aggression_up;
+        const text = pick(pool);
+        const milestone = a.deviationScore >= 50 ? "major" : "normal";
+        a.commentaries.push({ year: STATE.year, authorId: author.id, authorName: author.name, text, milestone });
+        a.lastCommentaryAt = STATE.year;
+        chron("c-art-commentary",
+          `${ref(author)} adds a commentary to ${aref(a)}: <em class="ac-inline">"${text}"</em>`,
+          milestone, [author.id], []);
+
+        /* a heavily diverged master may declare their interpretation its own tradition —
+           but only when the art hasn't branched recently (30-year cooldown per art) */
+        if (a.deviationScore >= 50 && author.realm >= 5 && chance(.18) &&
+            STATE.year - a.lastVariantAt >= 30) {
+          spawnVariant(a, author);
+        }
+      }
+    }
+
+    /* breakthrough: resistant high-talent practitioner discovers something through
+       opposition. Very rare (0.6%/year) and requires a 35-year cooldown on the art
+       to prevent cascade chains of variants spawning from variants. */
+    if (chance(.006) && STATE.year - a.lastVariantAt >= 35) {
+      const resistant = holders.filter(
+        f => artAffinity(f, a) === "resistant" && f.talent >= 66 && f.realm >= 4);
+      if (resistant.length) {
+        const genius = pick(resistant);
+        const ev = chron("c-art-breakthrough",
+          `${ref(genius)}, who struggled for years against the grain of ${aref(a)}, has found an unexpected resonance — mastering the art through resistance rather than harmony. A new branch is born from the friction.`,
+          "major", [genius.id], []);
+        spawnVariant(a, genius, ev.id);
       }
     }
   }
@@ -540,6 +669,7 @@ export function sysLostAndFound() {
     ]);
     const prevHolderId = a.lostHolderId;
     const lostEv = a.lostEvent;
+    const wasDormant = a.dormant;
     const f = makeFigure({ align: a.dormant ? "demonic" : (a.align === "demonic" ? "unorthodox" : a.align), realm: 1, age: ri(15,24), talent: arch.t, art: a });
     a.lost = false; a.dormant = false; a.holders = 1;
     if (a.lostHolder) { f.lineage = a.lostHolder + "'s legacy"; f.lineageId = prevHolderId; }
@@ -548,9 +678,27 @@ export function sysLostAndFound() {
       `In ${pick(REGIONS)}, ${arch.n} named ${plainRef(f)} stumbles upon ${aref(a)}, lost ${STATE.year - (a.lostYear || a.origin)} years. Fate chooses strangely.`,
       "major", [f.id], [], lostEv != null ? [lostEv] : []);
     f.originEvent = found.id;
-    if (a.dormant || a.align === "demonic") {
+    /* arts recovered after dormancy in demonic hands arrive with the lineage darkened:
+       whoever practised it in the vaults left their interpretation behind */
+    if (wasDormant && a.founderPrinciples) {
+      a.currentInterpretation.aggression = clamp((a.currentInterpretation.aggression || 50) + ri(10, 25), 0, 100);
+      a.currentInterpretation.mercy      = clamp((a.currentInterpretation.mercy      || 50) - ri(10, 18), 0, 100);
+      a.deviationScore = artDeviationScore(a);
+    }
+    /* a fragment is reconstructed imperfectly — missing sections create noise */
+    if (a.isFragment && a.founderPrinciples) {
+      for (const k of ART_PRINCIPLES) {
+        a.currentInterpretation[k] = clamp((a.currentInterpretation[k] || 50) + ri(-18, 18), 0, 100);
+      }
+      a.isRestoration = true;
+      a.deviationScore = artDeviationScore(a);
+      chron("c-art",
+        `${aref(a)}, recovered after ${STATE.year - (a.lostYear || a.origin)} years, is imperfectly restored — the lost sections were reconstructed from memory and hearsay. Some knowledge may be changed. Some may be wrong.`,
+        "normal", [f.id], [], [found.id]);
+    }
+    if (wasDormant || a.align === "demonic") {
       chron("c-corrupt",
-        `The manual is steeped in old malice. Those who hear of it fear what ${plainRef(f)} may become.`,
+        `The manual ${a.isRestoration ? 'was pieced together from fragments' : 'is steeped in old malice'}. Those who hear of it fear what ${plainRef(f)} may become.`,
         "normal", [f.id], [], [found.id]);
     }
   }
@@ -1488,6 +1636,7 @@ export function tick() {
     sysRegions();          // the mortal world breathes first; recruitment reads it
     sysSuccession();
     sysRecruitment();
+    sysArtEvolution();
     sysArtRefinement();
     sysRivalryAndWar();
     sysTournament();

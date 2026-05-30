@@ -1,5 +1,5 @@
 import { cap, clamp } from './rng.js';
-import { ALIGN, REALMS, REALM_KR, TERRAIN, DOCTRINES, artAffinity, artCorruptType } from './data.js';
+import { ALIGN, REALMS, REALM_KR, TERRAIN, DOCTRINES, artAffinity, artCorruptType, ART_PRINCIPLES } from './data.js';
 import { STATE, figById, regionByName } from './state.js';
 import { bloodGrudges } from './bloodlines.js';
 import { stanceLabel } from './factions.js';
@@ -14,6 +14,59 @@ export function setFollow(kind, id) {
 export function clearFollow() {
   FOLLOW.kind = null; FOLLOW.id = null;
   STATE.dirtyLog = true; STATE.dirtyPanels = true;
+}
+
+/* render the living-tradition panel for an art inside a dossier */
+function buildArtTraditionBlock(a) {
+  if (!a || !a.founderPrinciples || !a.currentInterpretation) return '';
+  const dev = a.deviationScore || 0;
+  const devColor = dev >= 55 ? "var(--blood)" : dev >= 30 ? "var(--sapa)" : "var(--ink-dim)";
+  const parentArt = a.parentId ? STATE.arts.find(x => x.id === a.parentId) : null;
+  let h = `<div class="art-tradition">`;
+  /* header */
+  h += `<div class="art-trad-hd">`;
+  h += `<span class="art-trad-label">${a.isRestoration ? '⚠ Restored' : a.isFragment ? '⚠ Fragment' : 'Living Tradition'}</span>`;
+  h += ` <span class="art-trad-dev" style="color:${devColor}">Deviation ${dev}</span>`;
+  if (parentArt) h += ` <span class="art-trad-parent">· Branch of <em class="art">${parentArt.name}</em></span>`;
+  h += `</div>`;
+  /* principle bars */
+  h += `<div class="art-prin-grid">`;
+  for (const k of ART_PRINCIPLES) {
+    const cur = a.currentInterpretation[k] || 0;
+    const fnd = a.founderPrinciples[k] || 0;
+    const delta = cur - fnd;
+    const isAggressive = k === "aggression" || k === "sacrifice";
+    const fillColor = isAggressive ? "var(--blood)" : "var(--azure)";
+    const deltaColor = Math.abs(delta) <= 5 ? "var(--ink-dim)"
+                     : delta > 0 ? (isAggressive ? "var(--sapa)" : "var(--jade)")
+                     : (isAggressive ? "var(--jade)" : "var(--sapa)");
+    const dStr = delta > 0 ? `+${delta}` : delta < 0 ? `${delta}` : '±0';
+    h += `<div class="ap-row">`;
+    h += `<span class="ap-key">${k}</span>`;
+    h += `<div class="ap-track">`;
+    h += `<div class="ap-fill" style="width:${cur}%;background:${fillColor}"></div>`;
+    h += `<div class="ap-founder-mark" style="left:${fnd}%"></div>`;
+    h += `</div>`;
+    h += `<span class="ap-delta" style="color:${deltaColor}">${dStr}</span>`;
+    h += `</div>`;
+  }
+  h += `</div>`;
+  /* recent commentaries */
+  if (a.commentaries && a.commentaries.length) {
+    h += `<div class="art-commentaries">`;
+    for (const c of a.commentaries.slice(-3)) {
+      h += `<div class="art-comment">`;
+      h += `<span class="ac-meta">Year ${c.year} · ${c.authorName || 'Unknown'}</span>`;
+      h += ` <em class="ac-text">"${c.text}"</em>`;
+      h += `</div>`;
+    }
+    if (a.commentaries.length > 3) {
+      h += `<div class="ac-meta" style="margin-top:3px">${a.commentaries.length - 3} older commentaries exist.</div>`;
+    }
+    h += `</div>`;
+  }
+  h += `</div>`;
+  return h;
 }
 
 function stripHtml(h) {
@@ -107,6 +160,8 @@ export function buildFigDossier(f) {
       const affColor = aff === "natural" ? "var(--jade)" : aff === "resistant" ? "var(--blood)" : "var(--ink-dim)";
       h += `<div class="dos-conn"><span class="dos-role">Art</span><em class="art">${f.art.name} (${f.art.kr})</em> tier ${f.art.tier}`;
       h += ` <span style="font-size:11px;color:${affColor}">${affLabel}${corrLabel}${f.art.cursed ? ' · <span style="color:var(--blood)">CURSED</span>' : ''}</span></div>`;
+      /* living tradition: principles, deviation, commentaries */
+      h += buildArtTraditionBlock(f.art);
     }
     const heldRelics = STATE.relics.filter(r => !r.lost && r.holderId === f.id);
     for (const r of heldRelics) {
@@ -305,7 +360,11 @@ export function buildSectDossier(s) {
   }
 
   if (s.signatureArt) {
-    h += `<div class="dos-conn" style="margin-top:8px"><span class="dos-role">Art</span><em class="art">${s.signatureArt.name} (${s.signatureArt.kr})</em></div>`;
+    const sa = s.signatureArt;
+    const ct = artCorruptType(sa);
+    const ctLabel = ct === "always" ? " · Inherently corruptive" : ct === "conditional" ? " · Conditionally corruptive" : "";
+    h += `<div class="dos-conn" style="margin-top:8px"><span class="dos-role">Art</span><em class="art">${sa.name} (${sa.kr})</em> tier ${sa.tier}${sa.cursed ? ' · <span style="color:var(--blood)">CURSED</span>' : ''}${ctLabel ? `<span style="font-size:11px;color:var(--ink-dim)">${ctLabel}</span>` : ''}</div>`;
+    h += buildArtTraditionBlock(sa);
   }
 
   if (living.length) {

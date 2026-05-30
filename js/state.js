@@ -3,7 +3,8 @@ import {
   SURNAMES, CLAN_SURNAMES, GIVEN,
   BH_PRE, BH_SUF, SECT_PRE, SECT_SUF, ART_PRE, ART_SUF,
   REGIONS, TERRAIN, REGION_TERRAIN, DOCTRINES, DOCTRINE_KEYS, ALIGN_PERSONALITY_BIAS,
-  RELIC_TYPES, RELIC_PRE, RELIC_SUF
+  RELIC_TYPES, RELIC_PRE, RELIC_SUF,
+  ART_PRINCIPLES, ALIGN_PRINCIPLES
 } from './data.js';
 
 export const STATE = {
@@ -50,20 +51,32 @@ export function makeArtName() {
 
 export function makeArt(align) {
   const nm = makeArtName();
+  const pp = ALIGN_PRINCIPLES[align] || ALIGN_PRINCIPLES.orthodox;
+  const founderPrinciples = {};
+  for (const k of ART_PRINCIPLES) founderPrinciples[k] = ri(pp[k][0], pp[k][1]);
   return {
     id: newId(), kind: "art",
     name: nm.en, kr: nm.kr, roman: nm.roman,
     tier: ri(2, 6),
     align,
     corruption: align === "demonic" ? ri(35,70) : align === "unorthodox" ? ri(15,40) : ri(0,12),
-    /* a cursed art spreads corruption passively to ANY holder, regardless of
-       personality or affinity — the manual itself is malevolent. Only demonic
-       arts are ever born cursed, and only a minority of them. */
+    /* a cursed art spreads corruption passively to ANY holder — the practice
+       itself is malevolent regardless of the practitioner's nature */
     cursed: align === "demonic" && chance(.28),
     lost: false, dormant: false,
     holders: 0, origin: STATE.year, lostYear: null,
     lostHolder: null, lostHolderId: null,
-    lostEvent: null
+    lostEvent: null,
+    /* living tradition fields */
+    founderPrinciples,
+    currentInterpretation: { ...founderPrinciples },
+    deviationScore: 0,
+    commentaries: [],        // [{year, authorId, authorName, text, milestone}]
+    parentId: null,          // set when this art is a variant/branch of another
+    isFragment: false,       // partially destroyed; knowledge is incomplete
+    isRestoration: false,    // reconstructed from fragments; imperfectly
+    lastCommentaryAt: 0,     // year of most recent commentary entry
+    lastVariantAt: 0         // year a branch was last spawned from this art
   };
 }
 
