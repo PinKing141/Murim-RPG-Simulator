@@ -335,6 +335,18 @@ export function buildSectDossier(s) {
   if (reg) {
     h += `<div class="dos-meta">Seat: ${TERRAIN[reg.terrain].label} — prosperity ${Math.round(reg.prosperity)}, stability ${Math.round(reg.stability)}, population ${Math.round(reg.population)}</div>`;
   }
+  /* succession: a named heir, or an active crisis tearing at the house */
+  if (s.succession) {
+    const yrs = STATE.year - s.succession.startYear;
+    const claimNames = s.succession.claimantIds.map(figById).filter(f => f && f.alive).map(f => f.name);
+    h += `<div class="dos-crisis"><span class="dos-role">Crisis</span>`;
+    h += `<b>Succession Crisis</b> · ${yrs} year${yrs === 1 ? '' : 's'} unresolved`;
+    if (claimNames.length) h += `<div class="dos-crisis-claim">Claimants: ${claimNames.slice(0, 4).join(', ')}</div>`;
+    h += `</div>`;
+  } else if (s.heirId != null) {
+    const heir = figById(s.heirId);
+    if (heir && heir.alive) h += `<div class="dos-conn"><span class="dos-role">Heir</span><span class="dos-link" data-follow-fig="${heir.id}">${heir.name}</span> — successor-in-waiting</div>`;
+  }
   if (s.patron) h += `<div class="dos-conn"><span class="dos-role">Court</span>Patronised by the Imperial Throne</div>`;
   if (s.doctrinalDebt >= 18) h += `<div class="dos-conn taint-mid"><span class="dos-role">Doctrine</span>Strained — forbidden methods harboured within (${Math.round(s.doctrinalDebt)})</div>`;
   if (s.reformLean >= 15) h += `<div class="dos-conn"><span class="dos-role">Reform</span>Non-conformist currents stir within the house</div>`;

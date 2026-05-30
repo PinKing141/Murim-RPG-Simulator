@@ -45,6 +45,7 @@ export function genesis(seed) {
     const founder = makeFigure({ align: s.align, sect: s, art: s.signatureArt, realm: ri(4,6), age: ri(48,70), talent: ri(55,90) });
     maybeName(founder, true);
     addToSect(s, founder); STATE.figures.push(founder);
+    s.headId = founder.id; s.founderId = founder.id; s.founderClan = founder.clan || null;
     const head = s.align === "demonic" ? "Cult Master (교주)" : s.align === "orthodox" ? "Sect Master (장문인)" : "Lord";
     chron("c-found",
       `${sref(s)} is founded in ${s.region} by ${ref(founder)}, ${head} of the house, who wields ${aref(s.signatureArt)}.`,

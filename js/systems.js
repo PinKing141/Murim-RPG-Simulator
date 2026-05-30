@@ -1,5 +1,5 @@
 import { rand, ri, pick, chance, clamp, cap } from './rng.js';
-import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN, TERRAIN, REGION_TERRAIN, IMPERIAL_REGION, DOCTRINES, artAffinity, artCorruptType, TOURNEY_NAMES, RELIC_DEEDS, PERSONALITY_PRINCIPLE_BIAS, ART_PRINCIPLES, ART_COMMENTARY, ART_BRANCH_NAMES } from './data.js';
+import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN, TERRAIN, REGION_TERRAIN, IMPERIAL_REGION, DOCTRINES, artAffinity, artCorruptType, TOURNEY_NAMES, RELIC_DEEDS, PERSONALITY_PRINCIPLE_BIAS, ART_PRINCIPLES, ART_COMMENTARY, ART_BRANCH_NAMES, LEGITIMACY_SOURCES, SECT_FACTIONS } from './data.js';
 import { STATE, aliveFigs, aliveSects, figById, makeFigure, makeArt, makeSect, addToSect, recomputeLife, recomputePower, makeByeolho, regionByName, makeRelic, relicById } from './state.js';
 import { chron, ref, plainRef, sref, aref, bref, rref } from './chronicle.js';
 import {
@@ -357,7 +357,10 @@ export function sysRecruitment() {
   for (const s of aliveSects()) {
     const living = s.members.map(figById).filter(x => x && x.alive);
     const r = regionByName(s.region);
-    const recruitP = clamp(0.18 + (r ? r.prosperity / 250 : 0.14), 0.08, 0.6);
+    /* a house mid-succession-crisis cannot attract disciples — who would swear
+       to a seat no one yet holds? */
+    const crisisMul = s.succession ? 0.3 : 1;
+    const recruitP = clamp((0.18 + (r ? r.prosperity / 250 : 0.14)) * crisisMul, 0.04, 0.6);
     if (living.length < 3) {
       for (let i = 0; i < ri(1, 2); i++) {
         const tr = recruitTraits(s);
@@ -717,6 +720,7 @@ export function sysSectFortune() {
       const s = makeSect({ align: founder.align, prestige: ri(30,50) });
       s.signatureArt = founder.art || pick(STATE.arts.filter(a => !a.lost)) || null;
       founder.sect = s;
+      s.headId = founder.id; s.founderId = founder.id; s.founderClan = founder.clan || null;
       addToSect(s, founder);
       STATE.sects.push(s);
       maybeName(founder, true);
@@ -1228,6 +1232,7 @@ function fractureSect(s, heir, rival, cause) {
     }
   }
   rival.sect = splinter; splinter.headId = rival.id;
+  splinter.founderId = rival.id; splinter.founderClan = rival.clan || null;
   s.headId = heir.id;
   /* a house that splits squanders the authority both halves once shared */
   legit(s, -ri(8, 15));
@@ -1245,43 +1250,352 @@ function fractureSect(s, heir, rival, cause) {
   return ev;
 }
 
+/* ---- legitimacy: a claimant's argued right to the seat ----
+   Succession in the murim is not won by the strongest arm but by whoever can
+   convince enough of the house that they deserve to lead. Each candidate is
+   measured across the sources of legitimacy; factions weigh those sources
+   differently, and a seat changes hands when a coalition forms — or fractures
+   the house when none can. */
+function legitimacyProfile(s, c, dead) {
+  const sources = {};
+  /* Founder's Blood — shares the founding surname, or descends from the founder */
+  if (s.founderClan && c.clan && c.clan === s.founderClan) sources.founderBlood = 28;
+  else if (s.founderId != null && genDistance(c, s.founderId) > 0) sources.founderBlood = 20;
+  /* Named Heir — the late head groomed them publicly */
+  if (s.heirId === c.id) sources.heirDesignate = 34;
+  /* Martial Merit — realm and raw power relative to the house */
+  sources.martialMerit = clamp(Math.round(c.realm * 6 + (c.power / 60)), 0, 40);
+  /* Elders' Assent — age, loyalty (a direct disciple of the head), service */
+  let elder = 0;
+  if (c.age >= 45) elder += 8;
+  if (dead && c.master === dead.id) elder += 12;
+  if (c.realm >= 5) elder += 6;
+  if (elder) sources.elderApproval = elder;
+  /* Popular Support — charisma wins the disciples' hearts */
+  if ((c.charisma || 0) >= 45) sources.popularSupport = clamp(Math.round((c.charisma - 30) / 2.5), 0, 28);
+  /* True to Doctrine — personality embodies (or betrays) the founding way */
+  const docMatch = c.personality === s.doctrine;
+  if (docMatch) sources.doctrineAlign = 22;
+  else if (DOCTRINES[c.personality] && DOCTRINES[s.doctrine]) {
+    /* a clashing personality actively costs legitimacy in a doctrinal house */
+    const clash = (s.align === "orthodox" && (c.personality === "bloodthirsty" || c.personality === "mercenary"));
+    if (clash) sources.doctrineAlign = -14;
+  }
+  const total = Object.values(sources).reduce((t, v) => t + v, 0);
+  return { total, sources };
+}
+
+/* the internal blocs that form around a vacant seat, and which claimant each backs.
+   Returns { factionKey: claimantId } — a coalition map. */
+function formFactions(s, claimants, profiles, dead) {
+  const living = s.members.map(figById).filter(x => x && x.alive);
+  const support = {};
+  const pickBy = (weigh) => {
+    let best = null, bestV = -1e9;
+    for (const c of claimants) {
+      const v = weigh(c, profiles.get(c.id));
+      if (v > bestV) { bestV = v; best = c; }
+    }
+    return best ? best.id : null;
+  };
+  /* Elders — value doctrine, the named heir, and the elders' own assent */
+  if (living.some(f => f.age >= 50 || f.realm >= 5))
+    support.elders = pickBy((c, p) => (p.sources.doctrineAlign || 0) + (p.sources.elderApproval || 0) + (p.sources.heirDesignate || 0) * 0.7);
+  /* Young disciples — value strength and charisma; they want glory */
+  if (living.some(f => f.age < 35))
+    support.youth = pickBy((c, p) => (p.sources.martialMerit || 0) + (p.sources.popularSupport || 0));
+  /* Founding family — values blood above all */
+  if (s.founderClan && living.some(f => f.clan === s.founderClan))
+    support.family = pickBy((c, p) => (p.sources.founderBlood || 0) * 2 + (p.sources.heirDesignate || 0) * 0.3);
+  /* The blades — value the strongest fighter, nothing else */
+  support.military = pickBy((c) => c.power);
+  return support;
+}
+
+/* tally faction backing; returns the leading claimant and whether they hold a majority */
+function tallyFactions(support) {
+  const counts = {};
+  for (const cid of Object.values(support)) if (cid != null) counts[cid] = (counts[cid] || 0) + 1;
+  const total = Object.values(counts).reduce((t, v) => t + v, 0);
+  let leadId = null, leadN = 0;
+  for (const [cid, n] of Object.entries(counts)) if (n > leadN) { leadN = n; leadId = +cid; }
+  return { counts, leadId, leadN, total, majority: total > 0 && leadN > total / 2 };
+}
+
+/* ---- heads age, and so they groom heirs long before they die ---- */
+export function sysHeirGrooming() {
+  for (const s of aliveSects()) {
+    if (!s.headId || s.succession) continue;
+    const head = figById(s.headId);
+    if (!head || !head.alive) continue;
+    /* only when the head feels mortality — old, or past their prime */
+    const aging = head.age >= head.lifespan - 18 || head.age >= 55;
+    if (!aging) continue;
+    const pool = s.members.map(figById).filter(f => f && f.alive && f.id !== head.id && f.realm >= 2 && f.age < head.age - 5);
+    if (pool.length < 1) continue;
+
+    /* re-evaluate occasionally; a head may change their favourite */
+    if (s.heirId != null && figById(s.heirId)?.alive && !chance(.04)) continue;
+    if (!chance(.22)) continue;
+
+    /* the head favours whoever best fits how THEY see the house — their own
+       personality colours the choice (a Scholarly head grooms a scholar; a
+       Bloodthirsty one grooms a killer), tempered by raw promise */
+    const profiles = new Map(pool.map(c => [c.id, legitimacyProfile(s, c, head)]));
+    let favourite = null, bestV = -1e9;
+    for (const c of pool) {
+      const p = profiles.get(c.id);
+      let v = p.total + c.power / 40;
+      if (c.personality === head.personality) v += 18;       // grooms in their own image
+      if (c.master === head.id) v += 10;                      // a direct disciple
+      if (s.founderClan && c.clan === s.founderClan) v += 6;
+      if (v > bestV) { bestV = v; favourite = c; }
+    }
+    if (!favourite || favourite.id === s.heirId) continue;
+
+    const prevHeir = s.heirId != null ? figById(s.heirId) : null;
+    s.heirId = favourite.id;
+    chron("c-faction",
+      `${ref(head)}, 장문인 of ${sref(s)}, marks ${ref(favourite)} as successor-in-waiting${prevHeir && prevHeir.alive ? `, passing over ${ref(prevHeir)}` : ""}.`,
+      "normal", [favourite.id, head.id], [s.id]);
+    /* the passed-over resent it — resentment that ripens into a succession crisis */
+    const passedOver = pool.filter(f => f.id !== favourite.id && f.power >= favourite.power * 0.8 && (f.realm >= 4 || (f.charisma||0) >= 55));
+    for (const r of passedOver) {
+      if (chance(.5)) addGrudge(r, favourite.id, { event: head.fallEvent });
+    }
+  }
+}
+
 export function sysSuccession() {
   for (const s of aliveSects()) {
+    /* an active crisis advances on its own clock, independent of new deaths */
+    if (s.succession) { advanceSuccessionCrisis(s); continue; }
+
     const living = s.members.map(figById).filter(x => x && x.alive).sort((a, b) => b.power - a.power);
     if (!living.length) { s.headId = null; continue; }
     const top = living[0];
-    if (s.headId == null) { s.headId = top.id; continue; }
-    const head = figById(s.headId);
-    if (head && head.alive) {
-      /* a clearly stronger member may eclipse an aging head without crisis */
-      if (head.id !== top.id && top.power > head.power * 1.4 && chance(.2)) s.headId = top.id;
+
+    /* capture founder identity the first time a head takes the seat */
+    if (s.headId == null) {
+      s.headId = top.id;
+      if (s.founderClan == null) { s.founderClan = top.clan || null; s.founderId = top.id; }
       continue;
     }
-    /* the 장문인 has died — is there a clear heir? orthodox seats turn on
-       legitimacy (bloodline, lineage, the elders' assent); unorthodox seats
-       turn on raw might alone, so a close contest splits the house. */
-    const cause = head && head.fallEvent != null ? [head.fallEvent] : [];
-    const unorthodox = s.align === "unorthodox";
-    const heirClear = unorthodox
-      ? (living.length < 2 || top.power >= living[1].power * 1.5)
-      : (top.realm >= 4 &&
-         (living.length < 2 || top.power >= living[1].power * 1.25) &&
-         (top.master === s.headId ||
-          (top.clan && head && head.clan && top.clan === head.clan) ||
-          chance(.4)));
-    /* legitimacy is leadership continuity made durable: a respected house
-       holds together through a murky succession; a hollow one shatters */
-    const fractureP = (unorthodox ? .65 : .55) * clamp(1.25 - s.legitimacy / 120, 0.3, 1.3);
-    if (!heirClear && living.length >= 2 && chance(fractureP)) {
-      fractureSect(s, top, living[1], cause);
-    } else {
-      s.headId = top.id;
-      legit(s, ri(2, 5));   // an orderly handover affirms the house's authority
-      if (top.realm >= 4 && chance(.5)) {
+    const head = figById(s.headId);
+    if (head && head.alive) {
+      /* a vastly stronger member may eclipse a frail head without a full crisis,
+         but only if the head lacks the legitimacy to hold the seat */
+      if (head.id !== top.id && top.power > head.power * 1.5 && s.legitimacy < 55 && chance(.12)) {
+        s.headId = top.id;
         chron("c-faction",
-          `${ref(top)} succeeds as 장문인 of ${sref(s)}, taking up the seat left empty${head ? ` by ${ref(head)}` : ""}.`,
-          "normal", [top.id], [s.id], cause);
+          `Power speaks where authority has thinned: ${ref(top)} eclipses ${ref(head)} as the true master of ${sref(s)} in all but name.`,
+          "normal", [top.id, head.id], [s.id]);
       }
+      continue;
+    }
+
+    /* THE SEAT IS VACANT — the head has died. Assemble claimants and weigh legitimacy. */
+    openSuccession(s, head, living);
+  }
+}
+
+/* gather claimants, form factions, and either resolve peacefully or open a crisis */
+function openSuccession(s, dead, living) {
+  const cause = dead && dead.fallEvent != null ? [dead.fallEvent] : [];
+  if (living.length === 1) { s.headId = living[0].id; s.heirId = null; return; }
+
+  /* claimants: the strongest, the most charismatic, the named heir, the blood */
+  const ranked = [...living].sort((a, b) => b.power - a.power);
+  const set = new Set();
+  const claimants = [];
+  const consider = f => { if (f && !set.has(f.id)) { set.add(f.id); claimants.push(f); } };
+  ranked.slice(0, 3).forEach(consider);                                  // the mighty
+  consider([...living].sort((a, b) => (b.charisma||0) - (a.charisma||0))[0]); // the beloved
+  if (s.heirId != null) consider(figById(s.heirId));                     // the named heir
+  if (s.founderClan) consider([...living].filter(f => f.clan === s.founderClan).sort((a,b)=>b.power-a.power)[0]);
+  const cl = claimants.filter(Boolean).slice(0, 5);
+  if (cl.length === 1) { s.headId = cl[0].id; s.heirId = null; legit(s, ri(2,5)); return; }
+
+  const profiles = new Map(cl.map(c => [c.id, legitimacyProfile(s, c, dead)]));
+  const support = formFactions(s, cl, profiles, dead);
+  const tally = tallyFactions(support);
+
+  /* a clear coalition + a legitimacy frontrunner who agrees → orderly succession.
+     Low house legitimacy and high tension make consensus far less likely. */
+  const frontrunner = [...cl].sort((a, b) => profiles.get(b.id).total - profiles.get(a.id).total)[0];
+  const consensus = tally.majority && tally.leadId === frontrunner.id;
+  const stabilityRoll = chance(clamp(s.legitimacy / 130 - (s.tensionDebt || 0) / 40, 0.05, 0.85));
+
+  if (consensus && stabilityRoll) {
+    /* peaceful — the path is named for why they won */
+    const fr = frontrunner, prof = profiles.get(fr.id);
+    const topSource = Object.entries(prof.sources).sort((a, b) => b[1] - a[1])[0];
+    const why = topSource && LEGITIMACY_SOURCES[topSource[0]] ? LEGITIMACY_SOURCES[topSource[0]].claim : "the house is of one mind";
+    s.headId = fr.id; s.heirId = null;
+    legit(s, ri(3, 7));
+    s.tensionDebt = Math.max(0, (s.tensionDebt || 0) - 3);
+    chron("c-faction",
+      `${ref(fr)} succeeds as 장문인 of ${sref(s)} — ${why}. The house holds together.`,
+      "normal", [fr.id], [s.id], cause);
+    return;
+  }
+
+  /* NO CONSENSUS — a living succession crisis begins. It will smoulder for years. */
+  s.succession = {
+    startYear: STATE.year,
+    deadId: dead ? dead.id : null,
+    claimantIds: cl.map(c => c.id),
+    support, heat: 0,
+    cause
+  };
+  legit(s, -ri(4, 9));
+  const factionLines = Object.entries(support)
+    .filter(([, cid]) => cid != null)
+    .map(([fk, cid]) => `${SECT_FACTIONS[fk].label} for ${plainRef(figById(cid))}`);
+  chron("c-schism",
+    `The seat of 장문인 falls vacant in ${sref(s)}, and no one voice claims it. Factions form: ${factionLines.slice(0, 3).join("; ")}. A succession crisis grips the house.`,
+    "major", cl.map(c => c.id), [s.id], cause);
+}
+
+/* a succession crisis is a state, not an instant — it builds, then breaks */
+function advanceSuccessionCrisis(s) {
+  const cr = s.succession;
+  const claimants = cr.claimantIds.map(figById).filter(f => f && f.alive);
+  /* deaths during the crisis thin the field; if it collapses to one, they win */
+  if (claimants.length <= 1) {
+    s.headId = claimants.length ? claimants[0].id : (s.members[0] || null);
+    s.heirId = null; s.succession = null;
+    if (claimants.length) chron("c-faction",
+      `The succession crisis in ${sref(s)} ends quietly: ${ref(claimants[0])} alone remains to take the seat.`,
+      "normal", claimants.length ? [claimants[0].id] : [], [s.id]);
+    return;
+  }
+
+  const years = STATE.year - cr.startYear;
+  /* heat rises with doctrinal tension and the closeness of the top two rivals */
+  const byPower = [...claimants].sort((a, b) => b.power - a.power);
+  const closeness = byPower.length >= 2 ? clamp(1 - (byPower[0].power - byPower[1].power) / Math.max(1, byPower[0].power), 0, 1) : 0;
+  cr.heat += 1 + closeness * 2 + (s.tensionDebt || 0) / 25;
+  legit(s, -ri(1, 3));   // every year of uncertainty bleeds authority
+
+  /* the crisis resolves once it has built enough pressure (or simply dragged on) */
+  const resolveP = clamp(cr.heat / 22 + years / 30, 0.05, 0.9);
+  if (!chance(resolveP)) {
+    /* interludes while the crisis simmers — rivals manoeuvre */
+    if (chance(.18)) {
+      const a = pick(claimants); let b = pick(claimants); let g=0; while (b===a && g++<4) b=pick(claimants);
+      if (a !== b) {
+        chron("c-faction",
+          `In the long uncertainty gripping ${sref(s)}, ${ref(a)} and ${ref(b)} ${pick(["trade veiled threats in the council hall","gather followers in the night","each claim the founding will favours them"])}.`,
+          "normal", [a.id, b.id], [s.id]);
+        if (chance(.4)) addGrudge(a, b.id, { event: cr.cause && cr.cause[0] });
+      }
+    }
+    return;
+  }
+
+  resolveSuccessionCrisis(s, claimants, byPower, closeness);
+}
+
+function resolveSuccessionCrisis(s, claimants, byPower, closeness) {
+  const cause = s.succession.cause || [];
+  const profiles = new Map(claimants.map(c => [c.id, legitimacyProfile(s, c, null)]));
+  const byLegit = [...claimants].sort((a, b) => profiles.get(b.id).total - profiles.get(a.id).total);
+  const champion = byLegit[0];       // most legitimate
+  const strongman = byPower[0];      // most powerful
+  const rival = byLegit[1] || byPower[1] || claimants.find(c => c !== champion);
+  const unorthodox = s.align === "unorthodox";
+  const highTension = (s.tensionDebt || 0) >= 5;
+
+  /* choose how it breaks. In the murim a house rarely produces a single winner —
+     far more often one side simply leaves. Schism is the default; the bloodier
+     and more orderly paths are the exceptions, gated by who the claimants are. */
+  let path;
+  const strongLowLegit = strongman && profiles.get(strongman.id).total < profiles.get(champion.id).total * 0.7
+                         && (strongman.personality === "bloodthirsty" || strongman.personality === "ambitious" || unorthodox);
+  /* a peaceful institutional resolution is possible only in a house that has kept
+     some authority through the crisis (legitimacy needn't be high, just not gutted) */
+  const orderly = s.legitimacy >= 40 && (s.tensionDebt || 0) < 6;
+  if (strongLowLegit && chance(.28)) path = "coup";                       // the cruel seize power — but rarely
+  else if (orderly && chance(.4)) path = chance(.5) ? "elderVote" : "ritualDuel";  // stable houses settle it
+  else if (s.founderClan && champion.clan === s.founderClan && chance(.35)) path = "familyTakeover";
+  else if (closeness > 0.5 && (highTension || (s.tensionDebt || 0) >= 3) && chance(.4)) path = "civilWar";  // close + bitter = blood
+  else path = chance(.82) ? "schism" : "peaceful";                       // otherwise: the house splits
+
+  s.succession = null;   // the crisis ends here, however it ends
+
+  switch (path) {
+    case "coup": {
+      /* the strongman seizes the seat by force, killing the rightful claimant */
+      const victim = champion.id === strongman.id ? rival : champion;
+      s.headId = strongman.id; s.heirId = null;
+      legit(s, -ri(10, 20));
+      const ev = chron("c-assassin",
+        `Steel settles what words could not: ${ref(strongman)} seizes the seat of ${sref(s)} by force, and ${ref(victim)} — the rightful claim — does not survive the night.`,
+        "major", [strongman.id, victim.id], [s.id], cause);
+      killFigure(victim, "is cut down in the succession coup", [ev.id], strongman.id,
+        { cls: "c-assassin", html: `${ref(victim)} falls to ${ref(strongman)}'s blades in the seizing of ${s.name}.` });
+      break;
+    }
+    case "civilWar": {
+      /* the house tears itself in two — a schism with blood */
+      const ev0 = chron("c-war",
+        `${sref(s)} turns its blades inward: the succession dispute between ${ref(champion)} and ${ref(rival)} erupts into open civil war within the house.`,
+        "major", [champion.id, rival.id], [s.id], cause);
+      const losers = claimants.filter(c => c !== champion && c !== rival);
+      for (const l of losers) if (chance(.4)) killFigure(l, "falls in the sect's civil war", [ev0.id], champion.id);
+      fractureSect(s, champion, rival, [ev0.id]);
+      legit(s, -ri(8, 16));
+      break;
+    }
+    case "schism": {
+      fractureSect(s, champion, rival, cause);
+      break;
+    }
+    case "familyTakeover": {
+      s.headId = champion.id; s.heirId = null;
+      legit(s, ri(2, 6));
+      chron("c-faction",
+        `The founding family closes ranks: ${ref(champion)}, of the founder's own blood, takes the seat of ${sref(s)} and the dissenters fall silent.`,
+        "major", [champion.id], [s.id], cause);
+      break;
+    }
+    case "elderVote": {
+      s.headId = champion.id; s.heirId = null;
+      legit(s, ri(4, 8));
+      s.tensionDebt = Math.max(0, (s.tensionDebt || 0) - 2);
+      chron("c-faction",
+        `The council of elders convenes and names ${ref(champion)} as 장문인 of ${sref(s)}. The crisis passes without bloodshed.`,
+        "major", [champion.id], [s.id], cause);
+      break;
+    }
+    case "ritualDuel": {
+      /* the two leading claimants settle it by the blade, before witnesses */
+      const winner = strongman, loser = (strongman.id === champion.id) ? rival : champion;
+      s.headId = winner.id; s.heirId = null;
+      const lethal = chance(.35);
+      const ev = chron("c-duel",
+        `The seat of ${sref(s)} is decided by ritual duel: ${ref(winner)} defeats ${ref(loser)} before the assembled house${lethal ? ", and does not stay their blade" : " and is acknowledged master"}.`,
+        "major", [winner.id, loser.id], [s.id], cause);
+      if (lethal) killFigure(loser, "falls in the succession duel", [ev.id], winner.id);
+      else addGrudge(loser, winner.id, { event: ev.id });
+      legit(s, ri(1, 5));
+      break;
+    }
+    case "outsiderSeizure": {
+      s.headId = strongman.id; s.heirId = null;
+      legit(s, -ri(4, 10));
+      chron("c-faction",
+        `${ref(strongman)} takes the seat of ${sref(s)} — a master whose nature the founders would scarcely recognise. The house is changed.`,
+        "major", [strongman.id], [s.id], cause);
+      break;
+    }
+    default: {  // peaceful, after a long crisis
+      s.headId = champion.id; s.heirId = null;
+      legit(s, ri(2, 5));
+      chron("c-faction",
+        `After years of uncertainty, ${sref(s)} settles on ${ref(champion)} as 장문인. The house exhales.`,
+        "normal", [champion.id], [s.id], cause);
     }
   }
 }
@@ -1634,6 +1948,7 @@ export function tick() {
   if (yearTurn) {
     sysAging();
     sysRegions();          // the mortal world breathes first; recruitment reads it
+    sysHeirGrooming();
     sysSuccession();
     sysRecruitment();
     sysArtEvolution();

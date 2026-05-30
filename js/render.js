@@ -259,7 +259,7 @@ export function renderPanels() {
         <span><b>${living.length}</b> disciples</span>
         <span>${s.region.replace("the ","").replace(/\s*\(.*\)/,"")}</span>
       </div>
-      ${lead ? `<div class="sect-meta"><span>Head: <b>${leadName}</b> · ${STATE.showHangul ? REALM_KR[lead.realm] : REALMS[lead.realm]}</span></div>` : ""}
+      ${s.succession ? `<div class="sect-meta"><span class="sect-crisis">⚔ Succession Crisis (${STATE.year - s.succession.startYear}y)</span></div>` : (lead ? `<div class="sect-meta"><span>Head: <b>${leadName}</b> · ${STATE.showHangul ? REALM_KR[lead.realm] : REALMS[lead.realm]}</span></div>` : "")}
       ${sb ? `<div class="sect-bloc" style="--bc:${ALIGN[sb.align].c}">${blocTag}</div>` : ""}
       ${s.alive && s.align === "unorthodox" ? `<div class="sect-stance">↔ ${stanceLabel(s.stance)}</div>` : ""}
       ${(() => {

@@ -186,6 +186,10 @@ export function makeSect(opts = {}) {
     members: [], allMembers: [],
     signatureArt: null,
     headId: null,
+    heirId: null,            // publicly groomed successor (set during the head's life)
+    founderClan: null,       // surname of the founding house, for bloodline legitimacy
+    founderId: null,
+    succession: null,        // ongoing crisis: {startYear, claimantIds, factions, heat, resolvePath}
     alive: true, deadYear: null,
     fallEvent: null,
     atWarWith: [],

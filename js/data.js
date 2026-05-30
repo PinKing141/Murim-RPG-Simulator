@@ -343,6 +343,34 @@ export const ART_BRANCH_NAMES = [
   ["Hidden","은"], ["Pure","정"], ["Ascendant","승"], ["Fallen","락"], ["Fractured","열"]
 ];
 
+/* ============================================================
+   SUCCESSION — legitimacy, factions, resolutions
+   ============================================================ */
+
+/* the sources by which a claimant argues their right to lead. Each carries a
+   short claim line for the chronicle. */
+export const LEGITIMACY_SOURCES = {
+  founderBlood:  { label:"Founder's Blood",   claim:"the founder's own blood runs in their veins" },
+  heirDesignate: { label:"Named Heir",        claim:"the late head named them successor" },
+  martialMerit:  { label:"Martial Merit",     claim:"none in the house can match their art" },
+  elderApproval: { label:"Elders' Assent",    claim:"the council of elders stands behind them" },
+  popularSupport:{ label:"Popular Support",   claim:"the disciples' hearts follow them" },
+  doctrineAlign: { label:"True to Doctrine",  claim:"they embody what the house was founded to be" }
+};
+
+/* internal power blocs that form around a vacant seat, each with what it wants */
+export const SECT_FACTIONS = {
+  elders:   { label:"the Elders",          kr:"장로회",  wants:"stability and the founding way" },
+  youth:    { label:"the Young Disciples", kr:"청년제자", wants:"glory and strength" },
+  family:   { label:"the Founding Family",  kr:"종가",    wants:"the bloodline unbroken" },
+  military: { label:"the Sect's Blades",    kr:"무력대",  wants:"the strongest hand at the helm" }
+};
+
+/* how a succession crisis can end */
+export const SUCCESSION_RESOLUTIONS = [
+  "peaceful", "elderVote", "ritualDuel", "familyTakeover", "coup", "schism", "civilWar", "outsiderSeizure"
+];
+
 /* ---------------- legendary relics ---------------- */
 
 /* Named objects with their own history. Unlike arts (which are practised),
