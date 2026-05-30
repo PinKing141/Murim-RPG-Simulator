@@ -321,7 +321,16 @@ export function sysCultivation() {
       recomputeLife(f); recomputePower(f);
       f.fame += 3 + f.realm;
       const fl = PATH_FLAVOR[f.align];
-      if (f.realm >= 3) {
+      /* notability gate: an anonymous disciple's minor breakthrough is not worth
+         recording. Log only when the figure is someone the Murim watches — a sect
+         head, a named master, the bearer of a blood grudge — or when the realm
+         reached is genuinely rare (Form Realm 화경, index 5, and above). */
+      const isHead    = f.sect && f.sect.headId === f.id;
+      const isNamed   = !!f.byeolho;
+      const hasGrudge = (f.grudges && f.grudges.length > 0);
+      const rareRealm = f.realm >= 5;
+      const notable   = isHead || isNamed || hasGrudge || rareRealm;
+      if (f.realm >= 3 && notable) {
         const lvl = f.realm >= 6 ? "major" : "normal";
         chron("c-break",
           `${ref(f)} ${fl.verb} the realm of <b style="color:var(--gold)">${REALMS[f.realm]} (${REALM_KR[f.realm]})</b>, ${pick(fl.via)}.`,
