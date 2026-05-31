@@ -238,6 +238,24 @@ export function buildFigDossier(f) {
     }
   }
 
+  // tournament record — only shown when they've ever stepped onto the platform
+  const tEntered = f.tournamentsEntered || 0;
+  const tWon = f.tournamentsWon || 0;
+  if (tEntered > 0) {
+    h += `<div class="dos-sec">Tournament Record</div>`;
+    const summary = tWon === 0
+      ? `${tEntered} appearance${tEntered === 1 ? '' : 's'} on the great platform — never the laurel`
+      : `${tWon} victor${tWon === 1 ? 'y' : 'ies'} from ${tEntered} appearance${tEntered === 1 ? '' : 's'}`;
+    h += `<div class="dos-conn"><span class="dos-role">Record</span>${summary}</div>`;
+    if (Array.isArray(f.tournamentWins) && f.tournamentWins.length) {
+      const winsTxt = f.tournamentWins.slice(0, 4)
+        .map(w => `<span class="dos-tourwin"><span class="dos-tourwin-yr">Y${w.year}</span> ${w.name} <span class="dos-tkr">${w.kr}</span></span>`)
+        .join('');
+      const more = f.tournamentWins.length > 4 ? ` <span class="dos-empty">+${f.tournamentWins.length - 4} more</span>` : '';
+      h += `<div class="dos-conn"><span class="dos-role">Crowns</span><div class="dos-tourwin-list">${winsTxt}${more}</div></div>`;
+    }
+  }
+
   // history explorer — blood, art, burdens, legacy
   h += `<button class="why-btn tree-btn" data-open-tree="${f.id}">${icon('scroll')} <span>Explore Their History</span></button>`;
 

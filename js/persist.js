@@ -58,10 +58,12 @@ export function snapshot() {
       blocs:   STATE.blocs,
       regions: STATE.regions,
       relics:  STATE.relics,
+      tournaments: STATE.tournaments,
       log:     STATE.log,
       activeWars: STATE.activeWars,
       threatActive: STATE.threatActive,
       lastThreatFall: STATE.lastThreatFall,
+      lastTournamentYear: STATE.lastTournamentYear,
       cultCooldownUntil: STATE.cultCooldownUntil,
       threatCooldownUntil: STATE.threatCooldownUntil,
       firstFemaleHeadSects: [...STATE.firstFemaleHeadSects],
@@ -89,10 +91,12 @@ export function restore(save) {
   STATE.blocs   = s.blocs   || [];
   STATE.regions = s.regions || [];
   STATE.relics  = s.relics  || [];
+  STATE.tournaments = s.tournaments || [];
   STATE.log     = s.log     || [];
   STATE.activeWars = s.activeWars || [];
   STATE.threatActive = !!s.threatActive;
   STATE.lastThreatFall = s.lastThreatFall ?? null;
+  STATE.lastTournamentYear = s.lastTournamentYear || 0;
   STATE.cultCooldownUntil = s.cultCooldownUntil || 0;
   STATE.threatCooldownUntil = s.threatCooldownUntil || 0;
   STATE.firstFemaleHeadSects = new Set(s.firstFemaleHeadSects || []);
@@ -117,6 +121,10 @@ export function restore(save) {
     f.art  = fc.artId  != null ? (artById.get(fc.artId)   || null) : null;
     f.sect = fc.sectId != null ? (sectById.get(fc.sectId) || null) : null;
     delete f.artId; delete f.sectId;
+    /* defaults for fields added after a save was written */
+    if (f.tournamentsEntered == null) f.tournamentsEntered = 0;
+    if (f.tournamentsWon == null) f.tournamentsWon = 0;
+    if (!Array.isArray(f.tournamentWins)) f.tournamentWins = [];
     STATE.figIndex.set(f.id, f);
     return f;
   });
