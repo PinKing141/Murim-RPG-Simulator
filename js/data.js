@@ -2,9 +2,37 @@ export const SURNAMES = ["Kim","Lee","Park","Choi","Jung","Kang","Cho","Yoon","J
 export const CLAN_SURNAMES = ["Namgung","Jegal","Dang","Moyong","Hwangbo","Sima","Dokgo","Seonu"];
 
 /* gendered given-name pools — used when gender is known at birth */
-export const GIVEN_MALE   = ["Mu-jin","Cheon","Ho","Jin","Woon","Hyuk","Hwi","Gang","Tae-ho","Jun","Soo","Seong","Hyun","Woo","Jae","Yul","Cheol","Dae","Gyeom","Sa-hyeon","Ui","Beom","Sang","Mu-gak","Cheol-won","Beom-su","Jae-ha","Tae-yang","Seon-ho","Gwon-il","Hak","Do-hyeon","Mu-hyeon","Chun-bae","Ryong"];
-export const GIVEN_FEMALE = ["Seol","Yeon","Rin","Hye-rin","Ryeon","Eun","Yeo-wol","Ha-rin","Seo-rin","Wol-hyang","So-yeon","Chae-rin","Bi-ryeon","Hwa-gyeong","Seo-hwa","Na-hyang","Wol-dan","Gyeong-hwa","Su-ryeon","Ha-eun","Jeong-hwa","Sa-wol","Cheon-hwa","Bi-dam","Na-hee","Seol-ha"];
-export const GIVEN_NEUTRAL = ["Min","Baek","Rin","Yul","San","Ha","Ryu","Woon"];
+export const GIVEN_MALE = [
+  /* single syllable */
+  "Cheon","Ho","Jin","Hwi","Gang","Jun","Soo","Woo","Jae","Yul","Cheol","Dae","Ui","Beom","Sang",
+  "Hak","Ryong","Gwang","Hwan","Yeong","Jang","Gi","Nam","Pil","Seok","Chan","Bong","Tae","Dok",
+  "Gwi","Il","Mun","Ik","Ryun","Bok","Gon","Won","Baek","Do","Geom","Hyo","Seong","Hyun","Hyeok",
+  /* two syllable */
+  "Mu-jin","Tae-ho","Sa-hyeon","Mu-gak","Cheol-won","Beom-su","Jae-ha","Tae-yang","Seon-ho",
+  "Gwon-il","Do-hyeon","Mu-hyeon","Chun-bae","Min-jun","Yeon-jun","Ji-hwan","Ju-won","Hyun-woo",
+  "Tae-in","Mu-won","Cheon-ik","Dong-hyun","Sang-ho","So-hwan","Do-jin","Baek-ho","Il-do",
+  "Chun-gwang","Mun-hak","Ik-su","Seong-jin","Hyeon-mu","Gang-ho","Woon-cheol","Jae-ryong",
+  "Seon-mun","Mu-gang","Cheol-in","Bong-hwan","Nam-il","Tae-geom","Ik-hyeon","Sang-cheol",
+  "Ryong-cheon","Hwan-gi","Gwang-cheol","Mu-in","Seok-bong","Cheon-mu","Jae-won","Hyun-gang",
+  "Do-beom","Sang-yul","Woo-jin","Beom-ik","Geon-ho","Tae-ryong","Il-gwang","Mu-seok",
+  "Cheol-gang","Jae-geom","Hyeon-beom","Seon-gang","Woon-hyuk","Nam-hwan","Gi-ryong","Do-gang"
+];
+export const GIVEN_FEMALE = [
+  /* single syllable */
+  "Seol","Yeon","Rin","Ryeon","Eun","Hwa","Dan","Bi","Wol","Ran","So","Ha","Seo","Hyang","Mae",
+  "Na","Gyeong","Su","Chae","Hye","Bo","Mi","Ji","Ra","Ok","Ryun","Hyeon","Sam","Ah","Hee",
+  /* two syllable */
+  "Hye-rin","Yeo-wol","Ha-rin","Seo-rin","Wol-hyang","So-yeon","Chae-rin","Bi-ryeon",
+  "Hwa-gyeong","Seo-hwa","Na-hyang","Wol-dan","Gyeong-hwa","Su-ryeon","Ha-eun","Jeong-hwa",
+  "Sa-wol","Cheon-hwa","Bi-dam","Na-hee","Seol-ha","Chae-won","Ji-yeon","So-hwa","Hye-won",
+  "Wol-mae","Dan-bi","Seol-ryeon","Mi-ryeon","Ji-hwa","Hyang-ran","So-wol","Gyeong-ran",
+  "Wol-ryeon","Na-gyeong","Hwa-ran","Eun-hye","Su-hwa","Chae-yeon","Dan-hwa","Rin-wol",
+  "Bi-hwa","Seol-wol","Hye-gyeong","So-rin","Seo-yeon","Na-wol","Wol-bi","Hwa-seol",
+  "Eun-ran","Chae-wol","So-dan","Ji-rin","Hye-dan","Bi-wol","Na-rin","Seo-dan","Ha-wol",
+  "Cheon-ran","Gyeong-bi","Su-wol","Hyang-bi","So-hyang","Eun-wol","Dan-seol","Ryeon-hwa",
+  "Bi-seol","Wol-ran","Hye-wol","So-ran","Gyeong-seol","Na-dan","Hwa-bi","Seo-wol","Chae-dan"
+];
+export const GIVEN_NEUTRAL = ["Min","Baek","Rin","Yul","San","Ha","Ryu","Woon","Hyeon","Do","Su","Ji","Seon","An"];
 
 /* keep legacy export so external code that imported GIVEN still works */
 export const GIVEN = [...GIVEN_MALE, ...GIVEN_FEMALE];
