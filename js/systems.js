@@ -99,7 +99,8 @@ function recruitTraits(s) {
   let lo = 15, hi = 72, drift = 0;
   if (t) {
     lo = t.talent[0]; hi = t.talent[1]; drift = t.drift;
-    const pf = (r.prosperity - 50) / 50;
+    const prosperity = (r.prosperity != null ? r.prosperity : 50);
+    const pf = (prosperity - 50) / 50;
     lo = clamp(Math.round(lo + pf * 8), 8, hi - 5);
   }
   if (doc?.talentBonus) { lo = clamp(lo + doc.talentBonus, 8, 95); hi = clamp(hi + doc.talentBonus, lo + 5, 98); }
@@ -1398,11 +1399,12 @@ function legitimacyProfile(s, c, dead) {
     const clash = (s.align === "orthodox" && (c.personality === "bloodthirsty" || c.personality === "mercenary"));
     if (clash) sources.doctrineAlign = -14;
   }
-  /* Succession Tradition — conservative sects resist female heirs; matriarchal sects resist male */
-  const tradition = s.successionTradition && SUCCESSION_TRADITIONS[s.successionTradition];
+  /* Succession Tradition — conservative sects resist female heirs; matriarchal sects resist male.
+     Guards: only apply when the key resolves to a known tradition and the bias is a finite number. */
+  const tradition = s.successionTradition ? SUCCESSION_TRADITIONS[s.successionTradition] : null;
   if (tradition) {
     const bias = c.gender === "female" ? tradition.femaleBonus : tradition.maleBonus;
-    if (bias !== 0) sources.traditionBias = bias;
+    if (typeof bias === "number" && bias !== 0) sources.traditionBias = bias;
   }
   const total = Object.values(sources).reduce((t, v) => t + v, 0);
   return { total, sources };
