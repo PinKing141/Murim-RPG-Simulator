@@ -10,9 +10,11 @@ export function genesis(seed) {
     idc: 1, evc: 1, year: 1, season: 0,
     seasonNames: ["Spring","Summer","Autumn","Winter"],
     figures: [], sects: [], arts: [], blocs: [], regions: [], relics: [],
+    tournaments: [],
     log: [], eventIndex: new Map(), figIndex: new Map(),
     dirtyLog: true, dirtyPanels: true,
     activeWars: [], threatActive: false, lastThreatFall: null,
+    lastTournamentYear: 0,
     cultCooldownUntil: 0, threatCooldownUntil: 0, seed,
     firstFemaleHeadSects: new Set(), firstMaleHeadSects: new Set(),
     firstFemaleRealm8: false, firstFemaleBloc: false, firstFemaleChampion: false

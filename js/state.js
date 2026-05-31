@@ -13,9 +13,11 @@ export const STATE = {
   idc: 1, evc: 1, year: 1, season: 0,
   seasonNames: ["Spring","Summer","Autumn","Winter"],
   figures: [], sects: [], arts: [], blocs: [], regions: [], relics: [],
+  tournaments: [],   // persistent records: { id, year, name, kr, bracket, champion, runnerUp, ... }
   log: [], eventIndex: new Map(), figIndex: new Map(),
   dirtyLog: true, dirtyPanels: true,
   activeWars: [], threatActive: false, lastThreatFall: null,
+  lastTournamentYear: 0,
   cultCooldownUntil: 0, threatCooldownUntil: 0, seed: 0,
   showHangul: true, eraCompress: true,
   firstFemaleHeadSects: new Set(),   // sect ids that have already had a female head
@@ -174,7 +176,11 @@ export function makeFigure(opts = {}) {
     bloodlineTaint: opts.bloodlineTaint || 0,
     taintSource: opts.taintSource || null,
     awakened: false,
-    killedBy: null
+    killedBy: null,
+    /* tournament record — running totals plus the years they took the title */
+    tournamentsEntered: 0,
+    tournamentsWon: 0,
+    tournamentWins: []   // [{ tourId, year, name, kr }]
   };
   recomputeLife(f);
   recomputePower(f);

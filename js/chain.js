@@ -1,4 +1,5 @@
 import { evById } from './chronicle.js';
+import { icon } from './icons.js';
 
 const MAX_NODES = 14;
 
@@ -52,19 +53,21 @@ export function buildChainView(focusId) {
   const { focus, roots, consequences } = chain;
   let h = '';
 
+  const link = `<div class="chain-link">${icon('arrowDownThin', { size: 16 })}</div>`;
+
   if (roots.length) {
     h += `<div class="chain-sec">What led here · 원인</div>`;
-    h += roots.map(e => row(e, focusId)).join('<div class="chain-link">↓</div>');
-    h += `<div class="chain-link">↓</div>`;
+    h += roots.map(e => row(e, focusId)).join(link);
+    h += link;
   }
 
   h += `<div class="chain-sec chain-sec-focus">This moment</div>`;
   h += row(focus, focusId);
 
   if (consequences.length) {
-    h += `<div class="chain-link">↓</div>`;
+    h += link;
     h += `<div class="chain-sec">What flowed from it · 결과</div>`;
-    h += consequences.map(e => row(e, focusId)).join('<div class="chain-link">↓</div>');
+    h += consequences.map(e => row(e, focusId)).join(link);
   }
 
   if (!roots.length && !consequences.length) {

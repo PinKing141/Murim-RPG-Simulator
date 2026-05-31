@@ -99,7 +99,8 @@ function recruitTraits(s) {
   let lo = 15, hi = 72, drift = 0;
   if (t) {
     lo = t.talent[0]; hi = t.talent[1]; drift = t.drift;
-    const pf = (r.prosperity - 50) / 50;
+    const prosperity = (r.prosperity != null ? r.prosperity : 50);
+    const pf = (prosperity - 50) / 50;
     lo = clamp(Math.round(lo + pf * 8), 8, hi - 5);
   }
   if (doc?.talentBonus) { lo = clamp(lo + doc.talentBonus, 8, 95); hi = clamp(hi + doc.talentBonus, lo + 5, 98); }
@@ -1398,11 +1399,12 @@ function legitimacyProfile(s, c, dead) {
     const clash = (s.align === "orthodox" && (c.personality === "bloodthirsty" || c.personality === "mercenary"));
     if (clash) sources.doctrineAlign = -14;
   }
-  /* Succession Tradition — conservative sects resist female heirs; matriarchal sects resist male */
-  const tradition = s.successionTradition && SUCCESSION_TRADITIONS[s.successionTradition];
+  /* Succession Tradition — conservative sects resist female heirs; matriarchal sects resist male.
+     Guards: only apply when the key resolves to a known tradition and the bias is a finite number. */
+  const tradition = s.successionTradition ? SUCCESSION_TRADITIONS[s.successionTradition] : null;
   if (tradition) {
     const bias = c.gender === "female" ? tradition.femaleBonus : tradition.maleBonus;
-    if (bias !== 0) sources.traditionBias = bias;
+    if (typeof bias === "number" && bias !== 0) sources.traditionBias = bias;
   }
   const total = Object.values(sources).reduce((t, v) => t + v, 0);
   return { total, sources };
@@ -2057,29 +2059,168 @@ export function sysRelics() {
   }
 }
 
-/* ---- tournaments: a public gathering where rankings shift ---- */
+/* ---- tournaments: a public gathering where rankings shift ----
+   A real bracket: the strongest are seeded, paired round by round, and
+   every match is its own chronicle entry. Results persist in STATE.tournaments
+   so a figure's tournament record (entries, wins, the years they took the
+   title) can be displayed in their dossier and weighed by the legendary-
+   title system (Tournament Grandmaster after three wins). */
+
+/* one match — outcome blended from power, talent, art tier, and luck. Returns
+   { winner, loser, margin: 'decisive' | 'hard-won' | 'razor-thin' | 'upset' } */
+function tourneyMatch(a, b) {
+  const score = (f, luck) =>
+    f.power
+    + f.talent * 2
+    + (f.art ? f.art.tier * 18 : 0)
+    + (f.realm >= 6 ? 60 : 0)
+    + luck * 280;
+  const lA = rand(), lB = rand();
+  const sA = score(a, lA), sB = score(b, lB);
+  const winner = sA >= sB ? a : b;
+  const loser  = sA >= sB ? b : a;
+  const baseA = a.power + a.talent * 2, baseB = b.power + b.talent * 2;
+  const favoured = baseA >= baseB ? a : b;
+  const upset = winner !== favoured && Math.abs(baseA - baseB) > 120;
+  const diff = Math.abs(sA - sB);
+  let margin = upset ? 'upset' :
+               diff > 350 ? 'decisive' :
+               diff > 140 ? 'hard-won' : 'razor-thin';
+  return { winner, loser, margin };
+}
+
+const MATCH_LINES = {
+  decisive:   ["overwhelms","crushes","unseats","sweeps aside","brushes past"],
+  'hard-won': ["edges out","outlasts","grinds down","narrowly bests","wears down"],
+  'razor-thin': ["defeats by a hairsbreadth","steals victory from","ekes out a win over","just barely overcomes"],
+  upset:      ["stuns the crowd by defeating","topples the favourite","shocks the platform by overcoming","fells the seeded"]
+};
+
+const ROUND_LABEL = { 8: "quarterfinal", 4: "semifinal", 2: "final" };
+
+/* play one round; report each match to the chronicle; return the winners */
+function playRound(matches, tName, openEvId, sect2eventIds) {
+  const winners = [];
+  for (const m of matches) {
+    const out = tourneyMatch(m.a, m.b);
+    const round = ROUND_LABEL[matches.length * 2] || "match";
+    const verb = pick(MATCH_LINES[out.margin]);
+    const tail = round === "final" ? "" : ` in the ${round}`;
+    const upsetTag = out.margin === 'upset' ? " — an upset the storytellers will not soon forget" : "";
+    const ev = chron("c-tourney",
+      `At ${tName}, ${ref(out.winner)} ${verb} ${ref(out.loser)}${tail}${upsetTag}.`,
+      round === "final" ? "major" : "normal",
+      [out.winner.id, out.loser.id],
+      [out.winner.sect, out.loser.sect].filter(Boolean).map(s => s.id),
+      [openEvId]);
+    /* attribute the match to its participants' sects for the bloc filter */
+    if (out.winner.sect) sect2eventIds.add(out.winner.sect.id);
+    if (out.loser.sect)  sect2eventIds.add(out.loser.sect.id);
+    /* a public defeat sometimes plants a grudge — sharper the closer the loss */
+    if (out.margin !== 'decisive' && chance(.35)) addGrudge(out.loser, out.winner.id, { event: ev.id });
+    m.winner = out.winner; m.loser = out.loser; m.margin = out.margin; m.eventId = ev.id;
+    winners.push(out.winner);
+  }
+  return winners;
+}
+
 export function sysTournament() {
-  if (!chance(.07)) return;
+  /* tournaments don't crowd each other — at most one every few years */
+  if (STATE.year - (STATE.lastTournamentYear || 0) < 3) return;
+  if (!chance(.10)) return;
   const contenders = aliveFigs().filter(f => f.realm >= 3 && f.age < 70);
   if (contenders.length < 4) return;
+
   const tn = pick(TOURNEY_NAMES);
-  const field = [...contenders].sort((a, b) => b.power - a.power).slice(0, Math.min(8, contenders.length));
-  /* the strongest usually win, but talent and luck let an underdog break through */
-  field.sort((a, b) => (b.power + b.talent * 2 + rand() * 240) - (a.power + a.talent * 2 + rand() * 240));
-  const champ = field[0], runnerUp = field[1];
+  const tName = `${tn[0]} (${tn[1]})`;
+  /* seed by raw power — the platform invites the names everyone knows */
+  const seeded = [...contenders].sort((a, b) => b.power - a.power);
+  const desired = seeded.length >= 8 ? 8 : 4;
+  const field = seeded.slice(0, desired);
+
   const open = chron("c-tourney",
-    `${tn[0]} (${tn[1]}) is convened — the mighty gather from across the Gangho to test their arts before the eyes of the world.`,
-    "major", field.slice(0, 4).map(f => f.id), []);
-  champ.fame += ri(8, 16); maybeName(champ);
-  if (champ.sect) { champ.sect.prestige = clamp(champ.sect.prestige + ri(5, 12), 0, 100); legit(champ.sect, ri(2, 6)); }
-  const upset = field.indexOf(contenders.sort((a, b) => b.power - a.power)[0]) > 1;
+    `${tn[0]} (${tn[1]}) is convened — ${field.length} of the mightiest from across the Gangho gather to test their arts before the eyes of the world.`,
+    "major", field.map(f => f.id), []);
+
+  /* tournament record carries the full bracket — every pairing & outcome */
+  const tour = {
+    id: STATE.tournaments.length + 1,
+    year: STATE.year, season: STATE.season,
+    name: tn[0], kr: tn[1],
+    openEvent: open.id, finalEvent: null,
+    fieldIds: field.map(f => f.id),
+    rounds: [],            // [[{aId,bId,winnerId,loserId,margin,eventId}, ...], ...]
+    championId: null, runnerUpId: null
+  };
+
+  for (const f of field) f.tournamentsEntered = (f.tournamentsEntered || 0) + 1;
+
+  /* standard knockout: pair seed N with the bottom seed across each round */
+  const sectEventIds = new Set();
+  let round = field;
+  while (round.length > 1) {
+    const matches = [];
+    for (let i = 0; i < round.length / 2; i++) {
+      matches.push({ a: round[i], b: round[round.length - 1 - i] });
+    }
+    const winners = playRound(matches, tName, open.id, sectEventIds);
+    tour.rounds.push(matches.map(m => ({
+      aId: m.a.id, bId: m.b.id,
+      winnerId: m.winner.id, loserId: m.loser.id,
+      margin: m.margin, eventId: m.eventId
+    })));
+    round = winners;
+  }
+
+  const champ = round[0];
+  const finalMatch = tour.rounds[tour.rounds.length - 1][0];
+  const runnerUp = figById(finalMatch.aId === champ.id ? finalMatch.bId : finalMatch.aId);
+
+  tour.championId = champ.id;
+  tour.runnerUpId = runnerUp ? runnerUp.id : null;
+  tour.finalEvent = finalMatch.eventId;
+
+  /* champion's record */
+  champ.tournamentsWon = (champ.tournamentsWon || 0) + 1;
+  champ.tournamentWins = champ.tournamentWins || [];
+  champ.tournamentWins.push({ tourId: tour.id, year: STATE.year, name: tn[0], kr: tn[1] });
+  champ.fame += ri(10, 18);
+  maybeName(champ);
+
+  if (champ.sect) {
+    champ.sect.prestige = clamp(champ.sect.prestige + ri(6, 14), 0, 100);
+    legit(champ.sect, ri(3, 8));
+  }
+
   const firstFemWin = champ.gender === "female" && !STATE.firstFemaleChampion;
   if (firstFemWin) STATE.firstFemaleChampion = true;
+
+  /* closing chronicle: the laurel ceremony */
+  const winsTotal = champ.tournamentsWon;
+  const repeatNote = winsTotal === 2
+    ? ` It is their second tournament victory.`
+    : winsTotal >= 3
+      ? ` Their ${winsTotal === 3 ? 'third' : winsTotal === 4 ? 'fourth' : `${winsTotal}th`} grand victory — the Gangho speaks of dynasty.`
+      : '';
   chron("c-tourney",
-    `${ref(champ)} stands victorious at ${tn[0]}, defeating ${ref(runnerUp)} in the final bout${upset ? " — an upset that will be spoken of for years" : ""}. ${champ.sect ? sref(champ.sect) + " basks in the glory." : "A wanderer's name echoes through the Gangho."}${firstFemWin ? ` The Murim falls quiet a moment — no woman has ever taken this stage before.` : ""}`,
-    "major", [champ.id, runnerUp.id], champ.sect ? [champ.sect.id] : [], [open.id]);
-  /* a grudge is born of a public defeat */
-  if (chance(.4)) addGrudge(runnerUp, champ.id, { event: open.id });
+    `${ref(champ)} is crowned champion of ${tn[0]}${runnerUp ? `, having defeated ${ref(runnerUp)} in the final bout` : ''}. ${champ.sect ? sref(champ.sect) + ' basks in the glory.' : "A wanderer's name echoes through the Gangho."}${firstFemWin ? ` The Murim falls quiet a moment — no woman has ever taken this stage before.` : ''}${repeatNote}`,
+    "major", [champ.id, ...(runnerUp ? [runnerUp.id] : [])],
+    champ.sect ? [champ.sect.id] : [],
+    [finalMatch.eventId]);
+
+  /* fame for everyone who made it past the first round */
+  const survivedRoundOne = new Set();
+  if (tour.rounds[0]) for (const m of tour.rounds[0]) survivedRoundOne.add(m.winnerId);
+  for (const id of survivedRoundOne) {
+    if (id === champ.id) continue;
+    const f = figById(id);
+    if (f) f.fame += ri(2, 5);
+  }
+  /* runner-up gets an extra dose */
+  if (runnerUp) { runnerUp.fame += ri(4, 8); maybeName(runnerUp); }
+
+  STATE.tournaments.push(tour);
+  STATE.lastTournamentYear = STATE.year;
 }
 
 /* ---- assassinations: a covert alternative to open war ---- */
