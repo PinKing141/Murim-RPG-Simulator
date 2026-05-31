@@ -113,7 +113,8 @@ export function buildFigDossier(f) {
   h += `<div class="dos-badges">`;
   h += `<span class="dos-badge" style="border-color:${al.c};color:${al.c}">${al.kr} ${al.label}</span>`;
   h += `<span class="dos-badge ${f.alive ? 'dos-alive' : 'dos-dead'}">${f.alive ? '● Alive' : '✦ Deceased'}</span>`;
-  if (f.isThreat) h += `<span class="dos-badge" style="border-color:var(--blood);color:var(--blood)">천마 Heavenly Demon</span>`;
+  if (f.legendaryTitle) h += `<span class="dos-badge dos-leg-title" style="border-color:var(--gold);color:var(--gold)">${f.legendaryTitle.en} · ${f.legendaryTitle.kr}</span>`;
+  else if (f.isThreat) h += `<span class="dos-badge" style="border-color:var(--blood);color:var(--blood)">천마 Heavenly Demon</span>`;
   h += `</div>`;
   h += `<div class="dos-meta">`;
   h += `Born Year ${f.born} · Age ${f.age}`;

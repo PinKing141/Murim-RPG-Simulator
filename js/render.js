@@ -315,7 +315,7 @@ export function renderPanels() {
         : { pw: "Power", fm: "Fame", ki: "Ki" };
       div.innerHTML = loc(`
         <div class="fig-name">${named ? `<span class="fig-alias">${cap(f.byeolho.en)} · ${f.byeolho.kr}</span>` : f.name}</div>
-        <div class="fig-sub">${named ? f.name + " · " : ""}${al.label}${f.isThreat ? ` · <span style="color:var(--blood)">천마 HEAVENLY DEMON</span>` : ""}${f.sect ? " · " + f.sect.name : " · wanderer"}</div>
+        <div class="fig-sub">${named ? f.name + " · " : ""}${al.label}${f.legendaryTitle ? ` · <span class="leg-title-card">${f.legendaryTitle.en} · ${f.legendaryTitle.kr}</span>` : f.isThreat ? ` · <span style="color:var(--blood)">천마 HEAVENLY DEMON</span>` : ""}${f.sect ? " · " + f.sect.name : " · wanderer"}</div>
         <span class="fig-realm">${REALMS[f.realm]} · ${REALM_KR[f.realm]}</span>
         <div class="fig-bars">
           <span>${lbl.pw}</span>${bar(f.power, 1100, al.c)}

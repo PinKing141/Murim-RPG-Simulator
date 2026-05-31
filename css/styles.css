@@ -918,6 +918,15 @@ button.ctl.primary:hover {
 .he-id-sub { font-size: 12.5px; color: var(--ink-dim); margin-top: 3px; }
 .he-demon { color: var(--blood); font-weight: 600; }
 
+/* legendary title — inline gold label used in figure cards, dossier, explorer */
+.leg-title      { color: var(--gold-bright); font-weight: 700; letter-spacing: .04em; }
+.leg-title-card { color: var(--gold-bright); font-weight: 600; }
+.dos-leg-title  { animation: leg-pulse 2.4s ease-in-out infinite; }
+@keyframes leg-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .65; }
+}
+
 .he-quads { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
 @media (max-width: 760px) { .he-quads { grid-template-columns: 1fr; } }
 .he-quad {

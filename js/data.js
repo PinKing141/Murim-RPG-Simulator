@@ -407,6 +407,140 @@ export const RELIC_DEEDS = [
   "passed to a worthier grip during"
 ];
 
+/* ---------------- legendary titles ---------------- */
+/*
+  A legendary title is NOT a rank above Nature Realm. It is a historical
+  recognition earned by deed. At most one living holder per kind. The title
+  persists in the chronicle after death — the world remembers.
+
+  kind        : internal key (also used for the "one seat" check)
+  en / kr     : display strings
+  pathReq     : which art path(s) qualify (null = any path)
+  alignReq    : which alignments qualify (null = any)
+  realmMin    : minimum realm index required
+  test(f,st)  : additional runtime predicate (receives figure + STATE)
+  announce    : function(f) → chronicle text fragment
+*/
+export const LEGENDARY_TITLES = [
+  {
+    kind: "sword-saint",
+    en: "Sword Saint", kr: "검성",
+    pathReq: ["sword"],
+    alignReq: ["orthodox","unorthodox","recluse"],
+    realmMin: 7,
+    test: (f) => f.fame >= 60,
+    announce: (f) =>
+      `The Murim speaks only one name when it speaks of the sword: ${ref(f)} is declared <b class="leg-title">Sword Saint (검성)</b>. There is no peer.`
+  },
+  {
+    kind: "saber-saint",
+    en: "Saber Saint", kr: "도성",
+    pathReq: ["saber"],
+    alignReq: ["orthodox","unorthodox","recluse"],
+    realmMin: 7,
+    test: (f) => f.fame >= 60,
+    announce: (f) =>
+      `No blade in the Murim sings like that of ${ref(f)}, who is hailed as <b class="leg-title">Saber Saint (도성)</b> — peerless among those who walk the blade-path.`
+  },
+  {
+    kind: "fist-saint",
+    en: "Fist Saint", kr: "권성",
+    pathReq: ["fist"],
+    alignReq: ["orthodox","unorthodox","recluse"],
+    realmMin: 7,
+    test: (f) => f.fame >= 55,
+    announce: (f) =>
+      `Bare-handed, without sword or saber, ${ref(f)} has surpassed them all. The Murim recognises a <b class="leg-title">Fist Saint (권성)</b>.`
+  },
+  {
+    kind: "spear-saint",
+    en: "Spear Saint", kr: "창성",
+    pathReq: ["spear"],
+    alignReq: null,
+    realmMin: 7,
+    test: (f) => f.fame >= 55,
+    announce: (f) =>
+      `At the end of a spear, ${ref(f)} stands where no rival dares follow. The age names them <b class="leg-title">Spear Saint (창성)</b>.`
+  },
+  {
+    kind: "divine-monk",
+    en: "Divine Monk", kr: "신승",
+    pathReq: ["inner","fist"],
+    alignReq: ["orthodox","recluse"],
+    realmMin: 7,
+    test: (f) => f.fame >= 55 && (f.personality === "devout" || f.personality === "reclusive" || f.personality === "scholarly"),
+    announce: (f) =>
+      `Beyond martial power, beyond sect rivalry — ${ref(f)} is called simply <b class="leg-title">Divine Monk (신승)</b>. The orthodox world bows.`
+  },
+  {
+    kind: "poison-king",
+    en: "Poison King", kr: "독왕",
+    pathReq: ["poison","inner"],
+    alignReq: ["unorthodox","demonic"],
+    realmMin: 6,
+    test: (f) => f.fame >= 50 && f.alignmentDrift >= 55,
+    announce: (f) =>
+      `From a hundred leagues away, the name of ${ref(f)} empties a room. The Gangho crowns them <b class="leg-title">Poison King (독왕)</b> in whispers.`
+  },
+  {
+    kind: "medicine-king",
+    en: "Medicine King", kr: "약왕",
+    pathReq: ["inner","medicine"],
+    alignReq: ["orthodox","recluse","unorthodox"],
+    realmMin: 5,
+    test: (f) => f.fame >= 45 && (f.personality === "devout" || f.personality === "scholarly" || f.personality === "reclusive"),
+    announce: (f) =>
+      `Neither war nor grudge has consumed ${ref(f)}. They are known across the Murim as <b class="leg-title">Medicine King (약왕)</b> — the healer whose hands both armies seek.`
+  },
+  {
+    kind: "martial-emperor",
+    en: "Martial Emperor", kr: "무제",
+    pathReq: null,
+    alignReq: ["orthodox","unorthodox"],
+    realmMin: 8,
+    test: (f, st) => {
+      const s = f.sect;
+      return f.fame >= 80 && s && s.headId === f.id && st.blocs.some(b => b.alive && b.members.includes(s.id) && b.members.length >= 3);
+    },
+    announce: (f) =>
+      `One name. One throne. Not of kingdoms but of the Murim entire. ${ref(f)} ascends as <b class="leg-title">Martial Emperor (무제)</b> — the undisputed pinnacle of all who walk the martial path.`
+  },
+  {
+    kind: "martial-king",
+    en: "Martial King", kr: "무왕",
+    pathReq: null,
+    alignReq: ["orthodox","unorthodox"],
+    realmMin: 7,
+    test: (f, st) => {
+      const s = f.sect;
+      return f.fame >= 70 && s && s.headId === f.id && st.blocs.some(b => b.alive && b.members.includes(s.id) && b.members.length >= 2);
+    },
+    announce: (f) =>
+      `Through war, trial, and long years, ${ref(f)} has proven supremacy over all contenders. The Murim knows them as <b class="leg-title">Martial King (무왕)</b>.`
+  },
+  /* Heavenly Demon (천마) is handled by the existing threat system —
+     see sysLegendaryTitles() which syncs isThreat → legendaryTitle. */
+];
+
+/* art suffix → martial path tag (used to match title pathReq) */
+export const ART_PATH_BY_SUF = {
+  "Singong":  "inner",   // Divine Art
+  "Geombeop": "sword",   // Sword Art
+  "Dobeop":   "saber",   // Saber Art
+  "Gwonbeop": "fist",    // Fist Art
+  "Jangbeop": "fist",    // Palm Art  (unarmed)
+  "Simbeop":  "inner",   // Heart Method
+  "Bobeop":   "inner",   // Step Method
+  "Jibeop":   "fist",    // Finger Art (unarmed)
+  "Sinbeop":  "inner"    // Movement Art
+};
+
+/* forward-declare ref/aref for use inside announce() — populated at runtime */
+let ref = f => f.name;
+
+/* called once by systems.js to inject the real ref() helper */
+export function initTitleRef(refFn) { ref = refFn; }
+
 /* ---------------- tournaments ---------------- */
 
 export const TOURNEY_NAMES = [

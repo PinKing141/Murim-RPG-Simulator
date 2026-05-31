@@ -237,7 +237,10 @@ function buildDetail(f) {
   h += `<div class="he-id-main"><span class="he-id-name">${figLabel(f)}</span>`;
   if (f.byeolho && f.namedAt != null) h += ` <span class="he-id-real">${f.name}</span>`;
   h += `</div>`;
-  h += `<div class="he-id-sub">${al.label}${pers ? ` · ${pers.label}` : ''} · ${REALMS[f.realm]} (${REALM_KR[f.realm]}) · ${f.born}${!f.alive && f.diedYear ? `–${f.diedYear}` : ' (living)'}${f.isThreat ? ' · <span class="he-demon">Heavenly Demon</span>' : ''}</div>`;
+  const legLabel = f.legendaryTitle
+    ? ` · <span class="leg-title">${f.legendaryTitle.en} · ${f.legendaryTitle.kr}</span>`
+    : f.isThreat ? ' · <span class="he-demon">Heavenly Demon</span>' : '';
+  h += `<div class="he-id-sub">${al.label}${pers ? ` · ${pers.label}` : ''} · ${REALMS[f.realm]} (${REALM_KR[f.realm]}) · ${f.born}${!f.alive && f.diedYear ? `–${f.diedYear}` : ' (living)'}${legLabel}</div>`;
   h += `</div>`;
 
   h += `<div class="he-quads">`;

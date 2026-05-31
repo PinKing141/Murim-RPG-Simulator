@@ -4,7 +4,7 @@ import {
   BH_PRE, BH_SUF, SECT_PRE, SECT_SUF, ART_PRE, ART_SUF,
   REGIONS, TERRAIN, REGION_TERRAIN, DOCTRINES, DOCTRINE_KEYS, ALIGN_PERSONALITY_BIAS,
   RELIC_TYPES, RELIC_PRE, RELIC_SUF,
-  ART_PRINCIPLES, ALIGN_PRINCIPLES
+  ART_PRINCIPLES, ALIGN_PRINCIPLES, ART_PATH_BY_SUF
 } from './data.js';
 
 export const STATE = {
@@ -46,7 +46,8 @@ export function makeSectName(align) {
 
 export function makeArtName() {
   const p = pick(ART_PRE), s = pick(ART_SUF);
-  return { roman: p[0] + " " + s[0], kr: p[1] + s[1], en: p[2] + " " + s[2] };
+  return { roman: p[0] + " " + s[0], kr: p[1] + s[1], en: p[2] + " " + s[2],
+           path: ART_PATH_BY_SUF[s[0]] || "inner" };
 }
 
 export function makeArt(align) {
@@ -57,6 +58,7 @@ export function makeArt(align) {
   return {
     id: newId(), kind: "art",
     name: nm.en, kr: nm.kr, roman: nm.roman,
+    path: nm.path,
     tier: ri(2, 6),
     align,
     corruption: align === "demonic" ? ri(35,70) : align === "unorthodox" ? ri(15,40) : ri(0,12),
@@ -149,7 +151,7 @@ export function makeFigure(opts = {}) {
     master: opts.master || null,
     lineage: opts.lineage || null,
     alive: true, born: STATE.year,
-    isThreat: false, namedAt: null,
+    isThreat: false, namedAt: null, legendaryTitle: null,
     grudges: [], brothers: [],
     realmHistory: [], lineageId: null,
     grudgeCause: {}, grudgeMeta: {},

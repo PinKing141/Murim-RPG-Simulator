@@ -1,5 +1,5 @@
 import { rand, ri, pick, chance, clamp, cap } from './rng.js';
-import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN, TERRAIN, REGION_TERRAIN, IMPERIAL_REGION, DOCTRINES, artAffinity, artCorruptType, TOURNEY_NAMES, RELIC_DEEDS, PERSONALITY_PRINCIPLE_BIAS, ART_PRINCIPLES, ART_COMMENTARY, ART_BRANCH_NAMES, LEGITIMACY_SOURCES, SECT_FACTIONS } from './data.js';
+import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN, TERRAIN, REGION_TERRAIN, IMPERIAL_REGION, DOCTRINES, artAffinity, artCorruptType, TOURNEY_NAMES, RELIC_DEEDS, PERSONALITY_PRINCIPLE_BIAS, ART_PRINCIPLES, ART_COMMENTARY, ART_BRANCH_NAMES, LEGITIMACY_SOURCES, SECT_FACTIONS, LEGENDARY_TITLES, initTitleRef } from './data.js';
 import { STATE, aliveFigs, aliveSects, figById, makeFigure, makeArt, makeSect, addToSect, recomputeLife, recomputePower, makeByeolho, regionByName, makeRelic, relicById } from './state.js';
 import { chron, ref, plainRef, sref, aref, bref, rref } from './chronicle.js';
 import {
@@ -12,6 +12,9 @@ import {
   addBlocGrudge, blocGrudgeAgainst
 } from './factions.js';
 import { eraIndex } from './metrics.js';
+
+/* give the legendary title announce() closures access to the real ref() helper */
+initTitleRef(f => ref(f));
 
 /* nudge a sect's institutional authority, kept in bounds */
 function legit(s, d) { if (s) s.legitimacy = clamp(s.legitimacy + d, 0, 100); }
@@ -144,6 +147,7 @@ export function killFigure(f, why, causes = [], killerId = null, opts = {}) {
   f.alive = false; f.diedYear = STATE.year; f.killedBy = killerId;
   if (f.sect) { f.sect.members = f.sect.members.filter(id => id !== f.id); }
   if (f.art) f.art.holders = Math.max(0, f.art.holders - 1);
+  passLegendaryTitleOnDeath(f);
   let deathEv = null;
   if (f.namedAt != null || f.realm >= 4) {
     const lvl = opts.level || (f.realm >= 6 ? "major" : "normal");
@@ -1947,6 +1951,72 @@ export function sysHermits() {
   }
 }
 
+/* ── Legendary Titles ──────────────────────────────────────────────────────
+   Each title has at most one living holder. Once per year we check whether
+   anyone has crossed the threshold. The Heavenly Demon (천마) is handled
+   separately by sysCorruptionAndThreat; we only sync its legendaryTitle here.
+   Titles are stripped on death by killFigure (via passLegendaryTitleOnDeath).
+   ──────────────────────────────────────────────────────────────────────── */
+export function sysLegendaryTitles() {
+  const alive = aliveFigs();
+
+  /* sync Heavenly Demon — whoever has isThreat is the Heavenly Demon */
+  for (const f of alive) {
+    if (f.isThreat && (!f.legendaryTitle || f.legendaryTitle.kind !== "heavenly-demon")) {
+      f.legendaryTitle = { kind: "heavenly-demon", en: "Heavenly Demon", kr: "천마" };
+    }
+    if (!f.isThreat && f.legendaryTitle && f.legendaryTitle.kind === "heavenly-demon") {
+      f.legendaryTitle = null;
+    }
+  }
+
+  /* collect which title kinds are already held */
+  const held = new Set(alive.filter(f => f.legendaryTitle).map(f => f.legendaryTitle.kind));
+
+  for (const title of LEGENDARY_TITLES) {
+    if (held.has(title.kind)) continue;          // seat occupied
+    if (!chance(.15)) continue;                  // only check ~15% of years per title
+
+    /* find candidates: realm, path, alignment all must qualify */
+    const candidates = alive.filter(f => {
+      if (f.realm < title.realmMin) return false;
+      if (title.alignReq && !title.alignReq.includes(f.align)) return false;
+      if (title.pathReq) {
+        const artPath = f.art ? f.art.path : "inner";
+        if (!title.pathReq.includes(artPath)) return false;
+      }
+      if (f.legendaryTitle) return false;        // can't hold two titles
+      return title.test(f, STATE);
+    });
+
+    if (!candidates.length) continue;
+
+    /* pick the most powerful / famous candidate */
+    const winner = candidates.sort((a, b) => (b.power + b.fame * 0.5) - (a.power + a.fame * 0.5))[0];
+    winner.legendaryTitle = { kind: title.kind, en: title.en, kr: title.kr };
+    winner.fame += 25;
+    maybeName(winner);
+
+    chron("c-rise",
+      title.announce(winner),
+      title.realmMin >= 8 ? "epic" : "major",
+      [winner.id]);
+
+    held.add(title.kind);
+  }
+}
+
+/* strip legendary title on death (called inside killFigure) */
+function passLegendaryTitleOnDeath(f) {
+  if (!f.legendaryTitle) return;
+  const t = f.legendaryTitle;
+  if (t.kind === "heavenly-demon") return; // already handled by threat system
+  chron("c-fall",
+    `With the death of ${ref(f)}, the seat of <b class="leg-title">${t.en} (${t.kr})</b> stands empty. The Murim will not soon forget.`,
+    "major", [f.id]);
+  f.legendaryTitle = null;
+}
+
 export function tick() {
   STATE.season++;
   if (STATE.season > 3) { STATE.season = 0; STATE.year++; }
@@ -1968,6 +2038,7 @@ export function tick() {
     sysCorruptionAndThreat();
     sysHermits();
     sysRelics();
+    sysLegendaryTitles();
     sysFactions();
     sysIdeology();
     sysPatronage();
