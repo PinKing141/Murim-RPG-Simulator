@@ -43,27 +43,3 @@ export function chron(cls, html, level, figs = [], sects = [], causes = []) {
   STATE.dirtyLog = true;
   return ev;
 }
-
-
-/*
-  Record a chronicle entry as an event node.
-  causes is an array of prior event ids that directly led to this one;
-  each cause gets a back-edge into its effects[] so the graph is walkable
-  both ways. Returns the new event so callers can wire downstream edges.
-*/
-export function chron(cls, html, level, figs = [], sects = [], causes = []) {
-  const validCauses = causes.filter(id => id != null && STATE.eventIndex.has(id));
-  const ev = {
-    id: newEvId(),
-    year: STATE.year, season: STATE.season,
-    cls, html, level: level || "normal",
-    figs, sects,
-    causes: validCauses,
-    effects: []
-  };
-  STATE.log.push(ev);
-  STATE.eventIndex.set(ev.id, ev);
-  for (const cid of validCauses) STATE.eventIndex.get(cid).effects.push(ev.id);
-  STATE.dirtyLog = true;
-  return ev;
-}
