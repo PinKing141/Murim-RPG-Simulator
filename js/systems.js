@@ -155,6 +155,7 @@ export function killFigure(f, why, causes = [], killerId = null, opts = {}) {
   f.alive = false; f.diedYear = STATE.year; f.killedBy = killerId;
   if (f.sect) { f.sect.members = f.sect.members.filter(id => id !== f.id); }
   if (f.art) f.art.holders = Math.max(0, f.art.holders - 1);
+  if (f.betrothed) { const p = figById(f.betrothed); if (p) p.betrothed = null; f.betrothed = null; }
   passLegendaryTitleOnDeath(f);
   let deathEv = null;
   if (f.namedAt != null || f.realm >= 4) {
@@ -766,28 +767,43 @@ export function sysSectFortune() {
 export function sysHeroicArcs() {
   if (chance(.18)) {
     const figs = aliveFigs().filter(f => f.realm >= 3);
-    if (figs.length >= 2) {
-      const a = pick(figs); let b = pick(figs); let g = 0; while (b === a && g++ < 4) b = pick(figs);
-      if (a !== b) {
-        /* choose bond text based on genders */
-        const bothMale   = a.gender === "male"   && b.gender === "male";
-        const bothFemale = a.gender === "female"  && b.gender === "female";
-        const bondLabel  = bothFemale ? "sisterhood" : bothMale ? "brotherhood" : "a sworn bond";
-        const bondFlower = bothFemale ? "the plum blossoms" : "the peach blossoms";
-        const arc = pick([
-          { cls: "c-peace",   kind: "brother",  fn: () => `${ref(a)} and ${ref(b)} swear ${bondLabel} beneath ${bondFlower}, vowing to share fortune and ruin alike.` },
-          { cls: "c-duel",    kind: "duel",     fn: () => `A bitter duel: ${ref(a)} defeats ${ref(b)} atop ${pick(["Sword-Testing Cliff","the Frozen Pavilion","Lone Goose Peak","the Drunken Bridge"])}, sparing ${proObj(b)} life — and earning a lifelong grudge.` },
-          { cls: "c-lineage", kind: "betray",   fn: () => `${ref(b)} betrays ${ref(a)}, stealing a page of ${proPoss(a)} manual under the new moon.` },
-          { cls: "c-lineage", kind: "disciple", fn: () => `${ref(a)} takes ${ref(b)} as a sworn disciple, passing down hard-won insight.` },
-          { cls: "c-peace",   kind: "romance",  fn: () => `Rumour spreads that ${ref(a)} has fallen in love with ${ref(b)} — a romance the sects forbid.` }
-        ]);
-        const html = arc.fn();
-        const ev = chron(arc.cls, html, "normal", [a.id, b.id]);
-        /* wire relationships, recording the event that birthed each grudge so wars can trace back to it */
-        if (arc.kind === "brother") { a.brothers.push(b.id); b.brothers.push(a.id); }
-        else if (arc.kind === "betray")  { addGrudge(a, b.id, { event: ev.id }); }
-        else if (arc.kind === "duel")    { addGrudge(b, a.id, { event: ev.id }); }
-      }
+    if (figs.length < 2) return;
+    const a = pick(figs); let b = pick(figs); let g = 0; while (b === a && g++ < 4) b = pick(figs);
+    if (a === b) return;
+
+    /* romance only fires between eligible unmarried opposite-gender pairs */
+    const romanceOk = a.gender !== b.gender && !a.spouse && !b.spouse
+      && !a.betrothed && !b.betrothed && !shareParent(a, b)
+      && ALIGN_OK(a.align, b.align);
+
+    /* choose bond text based on genders */
+    const bothMale   = a.gender === "male"   && b.gender === "male";
+    const bothFemale = a.gender === "female"  && b.gender === "female";
+    const bondLabel  = bothFemale ? "sisterhood" : bothMale ? "brotherhood" : "a sworn bond";
+    const bondFlower = bothFemale ? "the plum blossoms" : "the peach blossoms";
+
+    const arcPool = [
+      { cls: "c-peace",   kind: "brother",  fn: () => `${ref(a)} and ${ref(b)} swear ${bondLabel} beneath ${bondFlower}, vowing to share fortune and ruin alike.` },
+      { cls: "c-duel",    kind: "duel",     fn: () => `A bitter duel: ${ref(a)} defeats ${ref(b)} atop ${pick(["Sword-Testing Cliff","the Frozen Pavilion","Lone Goose Peak","the Drunken Bridge"])}, sparing ${proObj(b)} life — and earning a lifelong grudge.` },
+      { cls: "c-lineage", kind: "betray",   fn: () => `${ref(b)} betrays ${ref(a)}, stealing a page of ${proPoss(a)} manual under the new moon.` },
+      { cls: "c-lineage", kind: "disciple", fn: () => `${ref(a)} takes ${ref(b)} as a sworn disciple, passing down hard-won insight.` },
+    ];
+    if (romanceOk) {
+      arcPool.push({ cls: "c-bond", kind: "romance",
+        fn: () => `Rumour spreads that ${ref(a)} has fallen for ${ref(b)} — a romance the sects would forbid, if they knew. For now it lives only in stolen hours and careful glances.`
+      });
+    }
+
+    const arc = pick(arcPool);
+    const html = arc.fn();
+    const ev = chron(arc.cls, html, "normal", [a.id, b.id]);
+
+    if (arc.kind === "brother")  { a.brothers.push(b.id); b.brothers.push(a.id); }
+    else if (arc.kind === "betray")  { addGrudge(a, b.id, { event: ev.id }); }
+    else if (arc.kind === "duel")    { addGrudge(b, a.id, { event: ev.id }); }
+    else if (arc.kind === "romance") {
+      /* betrothal: they will marry if still eligible when sysBonds next runs */
+      a.betrothed = b.id; b.betrothed = a.id;
     }
   }
 }
@@ -798,7 +814,41 @@ const ALIGN_OK = (x, y) => !((x === "orthodox" && y === "demonic") || (x === "de
 const shareParent = (a, b) => a.parents.some(p => b.parents.includes(p));
 
 export function sysBonds() {
-  const eligible = aliveFigs().filter(f => f.spouse == null && f.align !== "recluse" && f.age >= 18 && f.age <= 55 && f.realm >= 1);
+  /* resolve or decay betrothals from romance arcs */
+  for (const f of aliveFigs()) {
+    if (!f.betrothed) continue;
+    const partner = figById(f.betrothed);
+    /* clear stale betrothal if partner died, married someone else, or is gone */
+    if (!partner || !partner.alive || partner.spouse != null || partner.betrothed !== f.id) {
+      f.betrothed = null; continue;
+    }
+    if (f.id > f.betrothed) continue;                  // process each pair once
+    /* marry if both are of age and compatible; otherwise wait or break */
+    const canMarry = f.age >= 18 && partner.age >= 18 && Math.abs(f.age - partner.age) <= 18
+      && ALIGN_OK(f.align, partner.align) && !shareParent(f, partner);
+    if (canMarry) {
+      f.spouse = partner.id; partner.spouse = f.id;
+      f.betrothed = null; partner.betrothed = null;
+      const bride = f.gender === "female" ? f : partner;
+      const groom = f.gender === "female" ? partner : f;
+      const crossBloc = f.sect && partner.sect && f.sect.id !== partner.sect.id;
+      const line = crossBloc
+        ? `, their union crossing house lines — what rumour called impossible, love made law`
+        : ` — what began in stolen glances ends in an oath beneath open sky`;
+      chron("c-bond",
+        `${ref(bride)} and ${ref(groom)} are wed${line}.`,
+        "major", [f.id, partner.id]);
+    } else if (chance(.15)) {
+      /* betrothal breaks — grief or sect pressure ends it */
+      const ev = chron("c-bond",
+        `The secret between ${ref(f)} and ${ref(partner)} ends without ceremony — duty, distance, or a sect elder's word parts them.`,
+        "normal", [f.id, partner.id]);
+      addGrudge(f, partner.id, { event: ev.id });
+      f.betrothed = null; partner.betrothed = null;
+    }
+  }
+
+  const eligible = aliveFigs().filter(f => f.spouse == null && f.betrothed == null && f.align !== "recluse" && f.age >= 18 && f.age <= 55 && f.realm >= 1);
   if (eligible.length < 2) return;
   for (let i = 0; i < ri(1, 2); i++) {
     if (!chance(.5)) continue;

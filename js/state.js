@@ -167,7 +167,7 @@ export function makeFigure(opts = {}) {
     grudgeCause: {}, grudgeMeta: {},
     originEvent: null, fallEvent: null, ascendEvent: null,
     /* bloodline & bonds */
-    spouse: null,
+    spouse: null, betrothed: null,
     parents: opts.parents || [],
     children: [],
     gen: opts.gen || 0,

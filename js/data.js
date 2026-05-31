@@ -76,7 +76,8 @@ export const ART_PRE = [
 export const ART_SUF = [
   ["Singong","신공","Divine Art"],["Geombeop","검법","Sword Art"],["Dobeop","도법","Saber Art"],
   ["Gwonbeop","권법","Fist Art"],["Jangbeop","장법","Palm Art"],["Simbeop","심법","Heart Method"],
-  ["Bobeop","보법","Step Method"],["Jibeop","지법","Finger Art"],["Sinbeop","신법","Movement Art"]
+  ["Bobeop","보법","Step Method"],["Jibeop","지법","Finger Art"],["Sinbeop","신법","Movement Art"],
+  ["Yakbeop","약법","Medicine Art"]
 ];
 
 export const REGIONS = ["the Central Plains (중원)","the Southern Marches","the Sacheon basin","the Frostbound North","the Misted East","the Demonic Frontier (새외)","the Imperial Capital","the Jade Coast","the Ten-Thousand Peaks","the Bleak Steppe"];
@@ -306,7 +307,8 @@ export const ART_POLARITY_BY_SUF = {
   "Simbeop":  "yin",      // Heart Method (inner cultivation)
   "Bobeop":   "balanced", // Step Method
   "Jibeop":   "yin",      // Finger Art (precise, internal)
-  "Sinbeop":  "balanced"  // Movement Art
+  "Sinbeop":  "balanced", // Movement Art
+  "Yakbeop":  "yin"       // Medicine Art (nurturing, receptive)
 };
 
 /* bonus/penalty modifier to cultivation gain based on polarity mismatch */
@@ -593,7 +595,7 @@ export const LEGENDARY_TITLES = [
   {
     kind: "medicine-king",
     en: "Medicine King", kr: "약왕",
-    pathReq: ["inner","medicine"],
+    pathReq: ["medicine","inner"],
     alignReq: ["orthodox","recluse","unorthodox"],
     realmMin: 5,
     test: (f) => f.fame >= 45 && (f.personality === "devout" || f.personality === "scholarly" || f.personality === "reclusive"),
@@ -626,21 +628,53 @@ export const LEGENDARY_TITLES = [
     announce: (f) =>
       `Through war, trial, and long years, ${ref(f)} has proven supremacy over all contenders. The Murim knows them as <b class="leg-title">Martial King (무왕)</b>.`
   },
+  {
+    kind: "beggar-king",
+    en: "Beggar King", kr: "개왕",
+    pathReq: null,
+    alignReq: ["orthodox","unorthodox","recluse"],
+    realmMin: 6,
+    test: (f, st) => {
+      /* leads or founded an itinerant sect, or is a wanderer of great renown */
+      const itinerantSect = f.sect && f.sect.doctrine === "itinerant";
+      const renownedWanderer = !f.sect && f.fame >= 55 && f.realm >= 6;
+      return (itinerantSect || renownedWanderer) && f.fame >= 45;
+    },
+    announce: (f) =>
+      `From gutter to legend — ${ref(f)} is crowned <b class="leg-title">Beggar King (개왕)</b> by the wanderers, beggars, and road-walkers of the Gangho. No throne, no manor. The road itself kneels.`
+  },
+  {
+    kind: "assassin-king",
+    en: "Assassin King", kr: "살왕",
+    pathReq: null,
+    alignReq: ["unorthodox","demonic"],
+    realmMin: 6,
+    test: (f) => {
+      /* a killer of renown — grudges fulfilled, personality fits the shadow path */
+      const shadowPersonality = ["scheming","mercenary","bloodthirsty","wrathful"].includes(f.personality);
+      const hasTrophies = (f.grudges && f.grudges.length === 0) && f.fame >= 50;
+      /* no living grudges = settled all debts through killing */
+      return shadowPersonality && f.fame >= 55 && f.realm >= 6;
+    },
+    announce: (f) =>
+      `The shadow guilds of the Gangho do not crown openly — but ${ref(f)}'s name has reached every ear. None dispute the title of <b class="leg-title">Assassin King (살왕)</b>. The blade-for-hire who became the blade all others fear.`
+  },
   /* Heavenly Demon (천마) is handled by the existing threat system —
      see sysLegendaryTitles() which syncs isThreat → legendaryTitle. */
 ];
 
 /* art suffix → martial path tag (used to match title pathReq) */
 export const ART_PATH_BY_SUF = {
-  "Singong":  "inner",   // Divine Art
-  "Geombeop": "sword",   // Sword Art
-  "Dobeop":   "saber",   // Saber Art
-  "Gwonbeop": "fist",    // Fist Art
-  "Jangbeop": "fist",    // Palm Art  (unarmed)
-  "Simbeop":  "inner",   // Heart Method
-  "Bobeop":   "inner",   // Step Method
-  "Jibeop":   "fist",    // Finger Art (unarmed)
-  "Sinbeop":  "inner"    // Movement Art
+  "Singong":  "inner",    // Divine Art
+  "Geombeop": "sword",    // Sword Art
+  "Dobeop":   "saber",    // Saber Art
+  "Gwonbeop": "fist",     // Fist Art
+  "Jangbeop": "fist",     // Palm Art  (unarmed)
+  "Simbeop":  "inner",    // Heart Method
+  "Bobeop":   "inner",    // Step Method
+  "Jibeop":   "fist",     // Finger Art (unarmed)
+  "Sinbeop":  "inner",    // Movement Art
+  "Yakbeop":  "medicine"  // Medicine Art
 };
 
 /* forward-declare ref/aref for use inside announce() — populated at runtime */
