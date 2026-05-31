@@ -1,0 +1,12 @@
+{
+  "name": "murim-rpg-simulator",
+  "version": "1.0.0",
+  "description": "A wuxia/murim dynasty chronicle simulator",
+  "private": true,
+  "scripts": {
+    "start": "live-server --port=8080"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}
