@@ -146,6 +146,62 @@ button.ctl.primary:hover {
 .speed button:hover { background: var(--paper-3); color: var(--ink-dim); }
 .speed button.on { background: #201a0c; color: var(--gold-bright); }
 
+/* archive cluster: save / load / export / import as a single visual unit */
+.archive {
+  display: inline-flex; align-items: stretch;
+  border: 1px solid var(--line-2); border-radius: 3px; overflow: hidden;
+}
+.archive button.ctl.ctl-icon {
+  border: none; border-radius: 0; padding: 7px 8px;
+  background: var(--paper-3); min-width: 30px;
+}
+.archive button.ctl.ctl-icon + button.ctl.ctl-icon {
+  border-left: 1px solid var(--line-2);
+}
+.archive button.ctl.ctl-icon:hover {
+  background: var(--paper-4); color: var(--gold-bright);
+}
+.archive button.ctl.flash-ok {
+  color: var(--jade);
+  animation: flash-ok .9s ease-out;
+}
+.archive button.ctl.flash-err {
+  color: var(--blood);
+  animation: flash-err .9s ease-out;
+}
+@keyframes flash-ok {
+  0%   { background: rgba(13,138,96,.35); }
+  100% { background: var(--paper-3); }
+}
+@keyframes flash-err {
+  0%   { background: rgba(181,42,32,.4); }
+  100% { background: var(--paper-3); }
+}
+
+/* transient confirmation toast — used by save/load/export */
+.toast {
+  position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+  z-index: 850;
+  background: linear-gradient(180deg, #181510, #0c0c08);
+  border: 1px solid var(--gold-dim);
+  color: var(--gold-pale);
+  font-family: 'Cinzel', serif; font-size: 11px; letter-spacing: .08em;
+  padding: 9px 18px; border-radius: 3px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.5), 0 0 0 1px rgba(200,149,42,.1);
+  display: flex; align-items: center; gap: 8px;
+  animation: toast-in .25s ease-out;
+}
+.toast.toast-err { border-color: var(--blood); color: #e0857c; }
+.toast.toast-fade { animation: toast-out .35s ease-in forwards; }
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: translate(-50%, 0); }
+  to   { opacity: 0; transform: translate(-50%, -8px); }
+}
+
 /* ================================================================
    PANELS
    ================================================================ */

@@ -73,6 +73,18 @@ const PATHS = {
   temple: `<path d="M2 6 L8 2 L14 6 L13 6 L13 13 L3 13 L3 6 Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
            <path d="M6 13 V9 H10 V13" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>`,
   banner: `<path d="M4 2 V14 M4 3 H13 L11 5.5 L13 8 H4" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"/>`,
+
+  /* persistence — save / load / export / import */
+  save: `<path d="M3 3 h8 l2 2 v8 a0.5 0.5 0 0 1 -0.5 0.5 h-9 a0.5 0.5 0 0 1 -0.5 -0.5 v-9.5 a0.5 0.5 0 0 1 0.5 -0.5z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+         <path d="M5 3 v3 h5 v-3" fill="none" stroke="currentColor" stroke-width="1.1"/>
+         <rect x="5.5" y="9" width="5" height="4" fill="none" stroke="currentColor" stroke-width="1"/>`,
+  load: `<path d="M2 5 a1 1 0 0 1 1 -1 h3 l1.5 1.5 h4.5 a1 1 0 0 1 1 1 v5 a1 1 0 0 1 -1 1 h-9 a1 1 0 0 1 -1 -1 z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+         <path d="M8 11 V6.5 M5.8 8.2 L8 6 L10.2 8.2" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>`,
+  download: `<path d="M8 2 V10 M5 7.5 L8 10.5 L11 7.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+             <path d="M3 12.5 H13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>`,
+  upload: `<path d="M8 11 V3 M5 6 L8 3 L11 6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+           <path d="M3 12.5 H13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>`,
+  check: `<path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`,
 };
 
 export function icon(name, opts = {}) {

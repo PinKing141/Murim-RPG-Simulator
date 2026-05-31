@@ -8,6 +8,10 @@ import { loc } from './i18n.js';
 import { STATE, figById } from './state.js';
 import { blocById } from './factions.js';
 import { icon } from './icons.js';
+import {
+  saveToStorage, loadFromStorage, hasStoredSave, storedSaveMeta,
+  exportToFile, importFromFile, saveSettings, loadSettings
+} from './persist.js';
 
 const $ = id => document.getElementById(id);
 
@@ -95,6 +99,39 @@ function start(seed) {
   loop();
 }
 
+/* resume a saved game: world state is already restored by persist.restore(),
+   we just need to (re)start the render loop and reset the UI */
+function resume() {
+  if (timer) clearTimeout(timer);
+  clearFollow();
+  closeProfile(); closeChain(); closeTree();
+  renderLog(); renderPanels();
+  loop();
+}
+
+/* ---- transient toast for save/load/export confirmations ---- */
+let toastTimer = null;
+function toast(msg, kind) {
+  const t = $("toast");
+  if (!t) return;
+  t.className = 'toast' + (kind === 'err' ? ' toast-err' : '');
+  t.innerHTML = (kind === 'err' ? '' : `<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`)
+    + `<span>${msg}</span>`;
+  t.style.display = 'flex';
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    t.classList.add('toast-fade');
+    toastTimer = setTimeout(() => { t.style.display = 'none'; t.classList.remove('toast-fade'); }, 350);
+  }, 2200);
+}
+
+function flashBtn(id, ok) {
+  const b = $(id); if (!b) return;
+  const cls = ok ? 'flash-ok' : 'flash-err';
+  b.classList.add(cls);
+  setTimeout(() => b.classList.remove(cls), 900);
+}
+
 /* pause / play — single button toggle with SVG icons */
 const PAUSE_SVG = `<svg class="ico ico-pause" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
   <rect x="4.5" y="3" width="2.5" height="10" fill="currentColor"/>
@@ -113,7 +150,12 @@ $("pause").addEventListener("click", () => {
   btn.classList.toggle('is-paused', paused);
 });
 
-$("reseed").addEventListener("click", () => start((Math.random() * 0xffffffff) >>> 0));
+$("reseed").addEventListener("click", () => {
+  start((Math.random() * 0xffffffff) >>> 0);
+  /* persist the freshly-seeded world so a refresh within the autosave window
+     resumes the new age, not the abandoned one */
+  saveToStorage();
+});
 
 $("hangul").addEventListener("click", e => {
   STATE.showHangul = !STATE.showHangul;
@@ -126,6 +168,7 @@ $("hangul").addEventListener("click", e => {
   if ($("chain-overlay").style.display === 'flex' && lastChainId != null) openChain(lastChainId);
   if ($("tree-overlay").style.display === 'flex' && lastTreeId != null) openTree(lastTreeId, lastTreeMode);
   if ($("profile-overlay").style.display === 'flex' && lastProfile) openProfile(lastProfile.kind, lastProfile.id);
+  persistSettings();
 });
 
 $("eras").addEventListener("click", e => {
@@ -136,6 +179,7 @@ $("eras").addEventListener("click", e => {
   if (lbl) lbl.textContent = STATE.eraCompress ? "Eras: On" : "Eras: Off";
   STATE.dirtyLog = true;
   renderLog();
+  persistSettings();
 });
 
 $("speed").addEventListener("click", e => {
@@ -143,6 +187,57 @@ $("speed").addEventListener("click", e => {
   if (!btn) return;
   speed = +btn.dataset.s;
   [...$("speed").children].forEach(b => b.classList.toggle("on", b === btn));
+  persistSettings();
+});
+
+/* ---- archive: save / load / export / import ---- */
+function persistSettings() {
+  saveSettings({
+    speed,
+    showHangul: STATE.showHangul,
+    eraCompress: STATE.eraCompress
+  });
+}
+
+$("save").addEventListener("click", () => {
+  const ok = saveToStorage();
+  flashBtn('save', ok);
+  toast(ok ? `Chronicle saved · Year ${STATE.year}` : 'Save failed', ok ? 'ok' : 'err');
+});
+
+$("load").addEventListener("click", () => {
+  if (!hasStoredSave()) { toast('No saved chronicle in this browser', 'err'); flashBtn('load', false); return; }
+  const save = loadFromStorage();
+  if (save) {
+    resume();
+    flashBtn('load', true);
+    toast(`Chronicle restored · Year ${STATE.year}`);
+  } else {
+    flashBtn('load', false);
+    toast('The saved chronicle is unreadable', 'err');
+  }
+});
+
+$("export").addEventListener("click", () => {
+  try { exportToFile(); flashBtn('export', true); toast(`Chronicle exported · Year ${STATE.year}`); }
+  catch (e) { flashBtn('export', false); toast('Export failed', 'err'); }
+});
+
+$("import").addEventListener("click", () => $("import-file").click());
+$("import-file").addEventListener("change", async e => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  try {
+    await importFromFile(file);
+    resume();
+    flashBtn('import', true);
+    toast(`Chronicle imported · Year ${STATE.year}`);
+  } catch (err) {
+    flashBtn('import', false);
+    toast('Could not read that chronicle: ' + (err.message || 'invalid file'), 'err');
+  } finally {
+    e.target.value = ''; // allow re-importing the same file
+  }
 });
 
 $("chron").addEventListener("scroll", e => {
@@ -252,6 +347,55 @@ $("chain-overlay").addEventListener("click", e => {
 
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") { closeChain(); closeTree(); closeProfile(); }
+  /* keyboard shortcuts for the archive: Ctrl/Cmd+S saves, Ctrl/Cmd+O loads */
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && !e.shiftKey) {
+    e.preventDefault();
+    $("save").click();
+  }
 });
 
-start((Math.random() * 0xffffffff) >>> 0);
+/* ---- boot: restore settings, then either resume the last save or start a new age ---- */
+
+function applySettings(s) {
+  if (!s) return;
+  if (typeof s.speed === 'number') {
+    const candidate = [...$("speed").children].find(b => +b.dataset.s === s.speed);
+    if (candidate) {
+      speed = s.speed;
+      [...$("speed").children].forEach(b => b.classList.toggle("on", b === candidate));
+    }
+  }
+  if (typeof s.showHangul === 'boolean' && s.showHangul !== STATE.showHangul) {
+    STATE.showHangul = s.showHangul;
+    const hb = $("hangul");
+    hb.classList.toggle("on", STATE.showHangul);
+    hb.textContent = STATE.showHangul ? "한 Hangul: On" : "한 Hangul: Off";
+    document.body.classList.toggle("no-hangul", !STATE.showHangul);
+  }
+  if (typeof s.eraCompress === 'boolean' && s.eraCompress !== STATE.eraCompress) {
+    STATE.eraCompress = s.eraCompress;
+    const eb = $("eras");
+    eb.classList.toggle("on", STATE.eraCompress);
+    const lbl = eb.querySelector('.ctl-label');
+    if (lbl) lbl.textContent = STATE.eraCompress ? "Eras: On" : "Eras: Off";
+  }
+}
+
+applySettings(loadSettings());
+
+/* if there's a save in storage, resume it; otherwise begin a fresh age */
+const meta = storedSaveMeta();
+if (meta && hasStoredSave() && loadFromStorage()) {
+  resume();
+  toast(`Resumed chronicle · Year ${STATE.year}`);
+} else {
+  start((Math.random() * 0xffffffff) >>> 0);
+}
+
+/* ---- autosave: every minute and on page hide, so a tab close doesn't kill the run ---- */
+const AUTOSAVE_MS = 60 * 1000;
+setInterval(() => { if (!paused) saveToStorage(); }, AUTOSAVE_MS);
+window.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saveToStorage();
+});
+window.addEventListener('beforeunload', () => { saveToStorage(); });
