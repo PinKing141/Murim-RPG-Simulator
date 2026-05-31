@@ -3,6 +3,7 @@ import { ALIGN, REALMS, REALM_KR, TERRAIN, DOCTRINES, artAffinity, artCorruptTyp
 import { STATE, figById, regionByName } from './state.js';
 import { bloodGrudges } from './bloodlines.js';
 import { stanceLabel } from './factions.js';
+import { icon } from './icons.js';
 
 export const FOLLOW = { kind: null, id: null };
 
@@ -25,7 +26,11 @@ function buildArtTraditionBlock(a) {
   let h = `<div class="art-tradition">`;
   /* header */
   h += `<div class="art-trad-hd">`;
-  h += `<span class="art-trad-label">${a.isRestoration ? '⚠ Restored' : a.isFragment ? '⚠ Fragment' : 'Living Tradition'}</span>`;
+  const tradTag = a.isRestoration ? 'Restored' : a.isFragment ? 'Fragment' : 'Living Tradition';
+  const tradWarn = (a.isRestoration || a.isFragment)
+    ? `<svg class="ico" viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M8 2 L14 13 H2 Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M8 6 V10 M8 11.5 V12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg> `
+    : '';
+  h += `<span class="art-trad-label">${tradWarn}${tradTag}</span>`;
   h += ` <span class="art-trad-dev" style="color:${devColor}">Deviation ${dev}</span>`;
   if (parentArt) h += ` <span class="art-trad-parent">· Branch of <em class="art">${parentArt.name}</em></span>`;
   h += `</div>`;
@@ -112,7 +117,7 @@ export function buildFigDossier(f) {
   if (named) h += `<div class="dos-aka">${f.name}</div>`;
   h += `<div class="dos-badges">`;
   h += `<span class="dos-badge" style="border-color:${al.c};color:${al.c}">${al.kr} ${al.label}</span>`;
-  h += `<span class="dos-badge ${f.alive ? 'dos-alive' : 'dos-dead'}">${f.alive ? '● Alive' : '✦ Deceased'}</span>`;
+  h += `<span class="dos-badge ${f.alive ? 'dos-alive' : 'dos-dead'}">${f.alive ? icon('dotFilled') + '<span>Alive</span>' : icon('starBurst') + '<span>Deceased</span>'}</span>`;
   if (f.gender === "female") h += `<span class="dos-badge dos-gender-f">여 Female</span>`;
   if (f.legendaryTitle) h += `<span class="dos-badge dos-leg-title" style="border-color:var(--gold);color:var(--gold)">${f.legendaryTitle.en} · ${f.legendaryTitle.kr}</span>`;
   else if (f.isThreat) h += `<span class="dos-badge" style="border-color:var(--blood);color:var(--blood)">천마 Heavenly Demon</span>`;
@@ -123,11 +128,14 @@ export function buildFigDossier(f) {
   h += ` · Talent ${f.talent} · Charisma ${f.charisma}`;
   h += `</div>`;
 
-  // causal "why?" traces for the figure's defining turns
+  // causal "why?" traces for the figure's defining turns.
+  // originEvent on a figure is only ever set when they recover a lost art (systems.js
+  // line ~724), so we phrase it that way rather than the more generic "found their art"
+  // which misled readers about figures who learned an art the normal way.
   const traces = [];
-  if (f.ascendEvent != null) traces.push(`<button class="why-btn" data-chain="${f.ascendEvent}">⛓ Why the Heavenly Demon?</button>`);
-  if (f.originEvent != null) traces.push(`<button class="why-btn" data-chain="${f.originEvent}">⛓ How they found their art</button>`);
-  else if (f.fallEvent != null) traces.push(`<button class="why-btn" data-chain="${f.fallEvent}">⛓ Why they fell</button>`);
+  if (f.ascendEvent != null) traces.push(`<button class="why-btn" data-chain="${f.ascendEvent}">${icon('chain')} <span>Why the Heavenly Demon?</span></button>`);
+  if (f.originEvent != null) traces.push(`<button class="why-btn" data-chain="${f.originEvent}">${icon('chain')} <span>How they recovered the lost art</span></button>`);
+  if (f.fallEvent != null) traces.push(`<button class="why-btn" data-chain="${f.fallEvent}">${icon('chain')} <span>Why they fell</span></button>`);
   if (traces.length) h += `<div class="dos-traces">${traces.join('')}</div>`;
 
   // cultivation timeline
@@ -157,7 +165,7 @@ export function buildFigDossier(f) {
     if (f.art) {
       const aff = artAffinity(f, f.art);
       const ct  = artCorruptType(f.art);
-      const affLabel = aff === "natural" ? "⬆ Natural affinity" : aff === "resistant" ? "⬇ Resists this art" : "Neutral";
+      const affLabel = aff === "natural" ? `${icon('arrowUp')} Natural affinity` : aff === "resistant" ? `${icon('arrowDown')} Resists this art` : "Neutral";
       const corrLabel = ct === "always" ? " · Inherently corruptive" : ct === "conditional" ? " · Corruptive to the resistant" : "";
       const affColor = aff === "natural" ? "var(--jade)" : aff === "resistant" ? "var(--blood)" : "var(--ink-dim)";
       const polLabel = f.art.polarity && f.art.polarity !== "balanced"
@@ -215,7 +223,7 @@ export function buildFigDossier(f) {
     }
     if (children.length) {
       const taintChild = (c) => {
-        const t = c.bloodlineTaint >= 80 ? ' ☯' : c.bloodlineTaint >= 40 ? ' ·' : '';
+        const t = c.bloodlineTaint >= 80 ? ' ' + icon('taegeuk', { cls: 'dos-taint-mark' }) : c.bloodlineTaint >= 40 ? ' ·' : '';
         const n = c.byeolho && c.namedAt != null ? cap(c.byeolho.en) : c.name;
         return `<span class="dos-link" data-follow-fig="${c.id}">${n}${t}</span>`;
       };
@@ -230,8 +238,26 @@ export function buildFigDossier(f) {
     }
   }
 
+  // tournament record — only shown when they've ever stepped onto the platform
+  const tEntered = f.tournamentsEntered || 0;
+  const tWon = f.tournamentsWon || 0;
+  if (tEntered > 0) {
+    h += `<div class="dos-sec">Tournament Record</div>`;
+    const summary = tWon === 0
+      ? `${tEntered} appearance${tEntered === 1 ? '' : 's'} on the great platform — never the laurel`
+      : `${tWon} victor${tWon === 1 ? 'y' : 'ies'} from ${tEntered} appearance${tEntered === 1 ? '' : 's'}`;
+    h += `<div class="dos-conn"><span class="dos-role">Record</span>${summary}</div>`;
+    if (Array.isArray(f.tournamentWins) && f.tournamentWins.length) {
+      const winsTxt = f.tournamentWins.slice(0, 4)
+        .map(w => `<span class="dos-tourwin"><span class="dos-tourwin-yr">Y${w.year}</span> ${w.name} <span class="dos-tkr">${w.kr}</span></span>`)
+        .join('');
+      const more = f.tournamentWins.length > 4 ? ` <span class="dos-empty">+${f.tournamentWins.length - 4} more</span>` : '';
+      h += `<div class="dos-conn"><span class="dos-role">Crowns</span><div class="dos-tourwin-list">${winsTxt}${more}</div></div>`;
+    }
+  }
+
   // history explorer — blood, art, burdens, legacy
-  h += `<button class="why-btn tree-btn" data-open-tree="${f.id}">📜 Explore Their History</button>`;
+  h += `<button class="why-btn tree-btn" data-open-tree="${f.id}">${icon('scroll')} <span>Explore Their History</span></button>`;
 
   // blood grudges callout
   if (bloodGrudgeIds.length) {
@@ -269,7 +295,7 @@ export function buildBlocDossier(b) {
   h += `<div class="dos-name">${b.kr}<span class="dos-kr"> · ${b.name}</span></div>`;
   h += `<div class="dos-badges">`;
   h += `<span class="dos-badge" style="border-color:${al.c};color:${al.c}">${b.type === "alliance" ? "正 Righteous Bloc" : "魔 Demonic Bloc"}</span>`;
-  h += `<span class="dos-badge ${b.alive ? 'dos-alive' : 'dos-dead'}">${b.alive ? '● Standing' : '✦ Dissolved'}</span>`;
+  h += `<span class="dos-badge ${b.alive ? 'dos-alive' : 'dos-dead'}">${b.alive ? icon('dotFilled') + '<span>Standing</span>' : icon('starBurst') + '<span>Dissolved</span>'}</span>`;
   if (b.threatLed) h += `<span class="dos-badge" style="border-color:var(--blood);color:var(--blood)">천마 Demon-Led</span>`;
   h += `</div>`;
   h += `<div class="dos-meta">Forged Year ${b.founded}${!b.alive && b.dissolvedYear ? ` · Dissolved Year ${b.dissolvedYear}` : ''} · ${b.memberSects.length} member sects (peak ${b.peakMembers})</div>`;
@@ -283,9 +309,9 @@ export function buildBlocDossier(b) {
 
   // causal traces
   const traces = [];
-  if (b.formEvent != null) traces.push(`<button class="why-btn" data-chain="${b.formEvent}">⛓ Why it formed</button>`);
-  if (b.wonEvent != null) traces.push(`<button class="why-btn" data-chain="${b.wonEvent}">⛓ Its victory</button>`);
-  if (b.dissolveEvent != null) traces.push(`<button class="why-btn" data-chain="${b.dissolveEvent}">⛓ Why it ${b.type === "alliance" ? "fractured" : "fell"}</button>`);
+  if (b.formEvent != null) traces.push(`<button class="why-btn" data-chain="${b.formEvent}">${icon('chain')} <span>Why it formed</span></button>`);
+  if (b.wonEvent != null) traces.push(`<button class="why-btn" data-chain="${b.wonEvent}">${icon('chain')} <span>Its victory</span></button>`);
+  if (b.dissolveEvent != null) traces.push(`<button class="why-btn" data-chain="${b.dissolveEvent}">${icon('chain')} <span>Why it ${b.type === "alliance" ? "fractured" : "fell"}</span></button>`);
   if (traces.length) h += `<div class="dos-traces">${traces.join('')}</div>`;
 
   // member sects
@@ -318,7 +344,7 @@ export function buildSectDossier(s) {
   h += `<div class="dos-name">${s.kr}<span class="dos-kr"> · ${s.name}</span></div>`;
   h += `<div class="dos-badges">`;
   h += `<span class="dos-badge" style="border-color:${al.c};color:${al.c}">${al.kr} ${al.label}</span>`;
-  h += `<span class="dos-badge ${s.alive ? 'dos-alive' : 'dos-dead'}">${s.alive ? '● Active' : '✦ Dissolved'}</span>`;
+  h += `<span class="dos-badge ${s.alive ? 'dos-alive' : 'dos-dead'}">${s.alive ? icon('dotFilled') + '<span>Active</span>' : icon('starBurst') + '<span>Dissolved</span>'}</span>`;
   h += `</div>`;
   const reg = regionByName(s.region);
   const doc = s.doctrine ? DOCTRINES[s.doctrine] : null;
@@ -381,12 +407,12 @@ export function buildSectDossier(s) {
     for (const g of s.blocGrudges) {
       const bl = STATE.blocs.find(x => x.id === g.blocId);
       const nm = bl ? `${bl.name} (${bl.kr})` : "a since-broken banner";
-      h += `<div class="dos-conn dos-wounds"><span class="dos-role">Y${g.year}</span>${nm} — ${g.reason}${g.event != null ? ` <button class="why-btn" data-chain="${g.event}">⛓</button>` : ""}</div>`;
+      h += `<div class="dos-conn dos-wounds"><span class="dos-role">Y${g.year}</span>${nm} — ${g.reason}${g.event != null ? ` <button class="why-btn" data-chain="${g.event}">${icon('chain')}</button>` : ""}</div>`;
     }
   }
 
   if (!s.alive && s.fallEvent != null) {
-    h += `<button class="why-btn" data-chain="${s.fallEvent}">⛓ Why did this house fall?</button>`;
+    h += `<button class="why-btn" data-chain="${s.fallEvent}">${icon('chain')} <span>Why did this house fall?</span></button>`;
   }
 
   if (s.signatureArt) {

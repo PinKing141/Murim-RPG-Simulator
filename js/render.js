@@ -3,10 +3,11 @@ import { ALIGN, REALMS, REALM_KR, DOCTRINES, SUCCESSION_TRADITIONS } from './dat
 import { STATE, aliveFigs, aliveSects, figById } from './state.js';
 import { sectMight, topMember } from './systems.js';
 import { aliveBlocs, blocById, sectBloc, stanceLabel } from './factions.js';
-import { FOLLOW, buildFigDossier, buildSectDossier, buildBlocDossier } from './follow.js';
+import { FOLLOW } from './follow.js';
 import { loc } from './i18n.js';
 import { vitals } from './metrics.js';
 import { compressLog } from './eras.js';
+import { icon } from './icons.js';
 
 /* how many recent years are always shown in full when era compression is on */
 const FULL_WINDOW = 40;
@@ -105,9 +106,12 @@ export function renderLog() {
       block.className = "era-block";
       const span = er.from === er.to ? `Year ${er.from}` : `Years ${er.from}–${er.to}`;
       let hl = '';
-      if (er.highlights.length) {
-        hl = `<div class="era-highlights">` + er.highlights.map(id =>
-          `<button class="era-hl" data-eid="${id}">⛓ a defining moment</button>`).join('') + `</div>`;
+      /* drop any highlight whose event has been pruned from the index — safer than
+         rendering a button that opens a blank chain reader */
+      const validHighlights = er.highlights.filter(id => STATE.eventIndex.has(id));
+      if (validHighlights.length) {
+        hl = `<div class="era-highlights">` + validHighlights.map(id =>
+          `<button class="era-hl" data-eid="${id}">${icon('chain')} <span>a defining moment</span></button>`).join('') + `</div>`;
       }
       block.innerHTML = loc(`
         <div class="era-title">${er.title} <span class="era-kr">${er.kr}</span></div>
@@ -139,11 +143,11 @@ export function renderLog() {
       if (causeEv && causeEv.year !== e.year) {
         const snippet = plainText(loc(causeEv.html) || causeEv.html);
         const short = snippet.length > 72 ? snippet.slice(0, 72) + '…' : snippet;
-        causeHint = `<div class="entry-cause" data-eid="${causeEv.id}">↳ Year ${causeEv.year} — <em>${short}</em></div>`;
+        causeHint = `<div class="entry-cause" data-eid="${causeEv.id}">${icon('arrowBend')} <span class="ec-yr">Year ${causeEv.year}</span> — <em>${short}</em></div>`;
       }
     }
 
-    d.innerHTML = `<span class="txt"><span class="tag">${STATE.seasonNames[e.season]}</span>${loc(e.html)}${hasChain ? `<span class="chain-mark" title="Trace cause &amp; consequence">⛓</span>` : ""}</span>${causeHint}`;
+    d.innerHTML = `<span class="txt"><span class="tag">${STATE.seasonNames[e.season]}</span>${loc(e.html)}${hasChain ? `<span class="chain-mark" title="Trace cause &amp; consequence">${icon('chain')}</span>` : ""}</span>${causeHint}`;
     frag.appendChild(d);
   }
   box.appendChild(frag);
@@ -192,10 +196,10 @@ export function renderPanels() {
         const lName = lead ? (lead.byeolho && lead.namedAt != null ? cap(lead.byeolho.en) : lead.name) : "—";
         const lRealm = lead ? (STATE.showHangul ? REALM_KR[lead.realm] : REALMS[lead.realm]) : "";
         const reason = powerReason(s);
-        html += loc(`<div class="power-card" style="--c:${al.c}">
+        html += loc(`<div class="power-card" data-sect-id="${s.id}" style="--c:${al.c}">
           <div class="power-name">${s.kr}<span class="en">${s.name}</span></div>
           <div class="power-head">${lName}${lRealm ? ' · ' + lRealm : ''}</div>
-          <div class="power-reason">↳ ${reason}</div>
+          <div class="power-reason">${icon('arrowBend')} <span>${reason}</span></div>
         </div>`);
       }
       powersEl.innerHTML = html;
@@ -259,16 +263,16 @@ export function renderPanels() {
         <span><b>${living.length}</b> disciples</span>
         <span>${s.region.replace("the ","").replace(/\s*\(.*\)/,"")}</span>
       </div>
-      ${s.succession ? `<div class="sect-meta"><span class="sect-crisis">⚔ Succession Crisis (${STATE.year - s.succession.startYear}y)</span></div>` : (lead ? `<div class="sect-meta"><span>Head: <b>${leadName}</b> · ${STATE.showHangul ? REALM_KR[lead.realm] : REALMS[lead.realm]}</span></div>` : "")}
+      ${s.succession ? `<div class="sect-meta"><span class="sect-crisis">${icon('swords')} <span>Succession Crisis (${STATE.year - s.succession.startYear}y)</span></span></div>` : (lead ? `<div class="sect-meta"><span>Head: <b>${leadName}</b> · ${STATE.showHangul ? REALM_KR[lead.realm] : REALMS[lead.realm]}</span></div>` : "")}
       ${sb ? `<div class="sect-bloc" style="--bc:${ALIGN[sb.align].c}">${blocTag}</div>` : ""}
-      ${s.alive && s.align === "unorthodox" ? `<div class="sect-stance">↔ ${stanceLabel(s.stance)}</div>` : ""}
+      ${s.alive && s.align === "unorthodox" ? `<div class="sect-stance">${icon('arrowH')} <span>${stanceLabel(s.stance)}</span></div>` : ""}
       ${(() => {
         const fd = s.doctrine && DOCTRINES[s.doctrine];
         const headFig = s.headId ? figById(s.headId) : null;
         const hp = headFig && headFig.alive && headFig.personality ? DOCTRINES[headFig.personality] : null;
         let out = '';
         if (fd) out += `<div class="doctrine-badge" style="color:${fd.c};border-color:${fd.c}" title="Founding doctrine">${fd.label}</div>`;
-        if (hp && hp !== fd) out += `<div class="doctrine-badge doctrine-badge-head" style="color:${hp.c};border-color:${hp.c}" title="Head personality">⚔ ${hp.label}</div>`;
+        if (hp && hp !== fd) out += `<div class="doctrine-badge doctrine-badge-head" style="color:${hp.c};border-color:${hp.c}" title="Head personality">${icon('swords')} <span>${hp.label}</span></div>`;
         const trad = s.successionTradition && SUCCESSION_TRADITIONS[s.successionTradition];
         if (trad && trad.key !== "meritocratic") out += `<div class="doctrine-badge sect-trad-badge" title="Succession tradition">${trad.kr}</div>`;
         return out;
@@ -278,56 +282,40 @@ export function renderPanels() {
     sl.appendChild(div);
   }
 
-  /* ---- right panel: dossier or figure list ---- */
+  /* ---- right panel: always the figure list (profiles now open in a modal,
+     and FOLLOW just filters chronicle events without consuming the sidebar) ---- */
   const dossierWrap = $("dossier-wrap");
   const figPanel    = $("fig-panel");
+  if (dossierWrap) { dossierWrap.style.display = 'none'; dossierWrap.innerHTML = ''; }
+  figPanel.style.display = '';
 
-  if (FOLLOW.kind === 'fig') {
-    const f = figById(FOLLOW.id);
-    figPanel.style.display = 'none';
-    dossierWrap.style.display = 'block';
-    dossierWrap.innerHTML = f ? loc(buildFigDossier(f)) : '<div class="dos-empty">Figure not found.</div>';
-  } else if (FOLLOW.kind === 'sect') {
-    const s = STATE.sects.find(x => x.id === FOLLOW.id);
-    figPanel.style.display = 'none';
-    dossierWrap.style.display = 'block';
-    dossierWrap.innerHTML = s ? loc(buildSectDossier(s)) : '<div class="dos-empty">Sect not found.</div>';
-  } else if (FOLLOW.kind === 'bloc') {
-    const b = blocById(FOLLOW.id);
-    figPanel.style.display = 'none';
-    dossierWrap.style.display = 'block';
-    dossierWrap.innerHTML = b ? loc(buildBlocDossier(b)) : '<div class="dos-empty">Bloc not found.</div>';
-  } else {
-    figPanel.style.display = '';
-    dossierWrap.style.display = 'none';
-
-    const fl = $("figlist");
-    const figs = aliveFigs().sort((a,b) => (b.isThreat - a.isThreat) || (b.power - a.power)).slice(0, 12);
-    $("figct").textContent = aliveFigs().length;
-    fl.innerHTML = "";
-    for (const f of figs) {
-      const al = ALIGN[f.align];
-      const div = document.createElement("div");
-      div.className = "figcard";
-      div.dataset.id = f.id;
-      div.style.setProperty("--c", al.c);
-      const named = f.byeolho && f.namedAt != null;
-      const lbl = STATE.showHangul
-        ? { pw: "내공", fm: "명성", ki: "마기" }
-        : { pw: "Power", fm: "Fame", ki: "Ki" };
-      div.innerHTML = loc(`
-        <div class="fig-name">${named ? `<span class="fig-alias">${cap(f.byeolho.en)} · ${f.byeolho.kr}</span>` : f.name}</div>
-        <div class="fig-sub">${named ? f.name + " · " : ""}${al.label}${f.gender === "female" ? ' · <span class="fig-gender-f">여</span>' : ""}${f.legendaryTitle ? ` · <span class="leg-title-card">${f.legendaryTitle.en} · ${f.legendaryTitle.kr}</span>` : f.isThreat ? ` · <span style="color:var(--blood)">천마 HEAVENLY DEMON</span>` : ""}${f.sect ? " · " + f.sect.name : " · wanderer"}</div>
-        <span class="fig-realm">${REALMS[f.realm]} · ${REALM_KR[f.realm]}</span>
-        <div class="fig-bars">
-          <span>${lbl.pw}</span>${bar(f.power, 1100, al.c)}
-          <span>${lbl.fm}</span>${bar(f.fame, 60, "var(--gold)")}
-          <span>${lbl.ki}</span>${bar(f.alignmentDrift, 100, "var(--magyo)")}
-        </div>
-        ${f.art ? `<div class="fig-sub" style="margin-top:6px">${f.art.name} (${f.art.kr}) · tier ${f.art.tier}</div>` : ""}
-        ${(() => { const p = f.personality && DOCTRINES[f.personality]; return p ? `<div class="doctrine-badge doctrine-badge-fig" style="color:${p.c};border-color:${p.c}">${p.label}</div>` : ''; })()}
-      `);
-      fl.appendChild(div);
-    }
+  const fl = $("figlist");
+  const figs = aliveFigs().sort((a,b) => (b.isThreat - a.isThreat) || (b.power - a.power)).slice(0, 12);
+  $("figct").textContent = aliveFigs().length;
+  fl.innerHTML = "";
+  for (const f of figs) {
+    const al = ALIGN[f.align];
+    const div = document.createElement("div");
+    const isFollowed = FOLLOW.kind === 'fig' && FOLLOW.id === f.id;
+    div.className = "figcard" + (isFollowed ? " followed" : "");
+    div.dataset.id = f.id;
+    div.style.setProperty("--c", al.c);
+    const named = f.byeolho && f.namedAt != null;
+    const lbl = STATE.showHangul
+      ? { pw: "내공", fm: "명성", ki: "마기" }
+      : { pw: "Power", fm: "Fame", ki: "Ki" };
+    div.innerHTML = loc(`
+      <div class="fig-name">${named ? `<span class="fig-alias">${cap(f.byeolho.en)} · ${f.byeolho.kr}</span>` : f.name}</div>
+      <div class="fig-sub">${named ? f.name + " · " : ""}${al.label}${f.gender === "female" ? ' · <span class="fig-gender-f">여</span>' : ""}${f.legendaryTitle ? ` · <span class="leg-title-card">${f.legendaryTitle.en} · ${f.legendaryTitle.kr}</span>` : f.isThreat ? ` · <span style="color:var(--blood)">천마 HEAVENLY DEMON</span>` : ""}${f.sect ? " · " + f.sect.name : " · wanderer"}</div>
+      <span class="fig-realm">${REALMS[f.realm]} · ${REALM_KR[f.realm]}</span>
+      <div class="fig-bars">
+        <span>${lbl.pw}</span>${bar(f.power, 1100, al.c)}
+        <span>${lbl.fm}</span>${bar(f.fame, 60, "var(--gold)")}
+        <span>${lbl.ki}</span>${bar(f.alignmentDrift, 100, "var(--magyo)")}
+      </div>
+      ${f.art ? `<div class="fig-sub" style="margin-top:6px">${f.art.name} (${f.art.kr}) · tier ${f.art.tier}</div>` : ""}
+      ${(() => { const p = f.personality && DOCTRINES[f.personality]; return p ? `<div class="doctrine-badge doctrine-badge-fig" style="color:${p.c};border-color:${p.c}">${p.label}</div>` : ''; })()}
+    `);
+    fl.appendChild(div);
   }
 }

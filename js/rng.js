@@ -1,13 +1,24 @@
-export const RNG = { fn: null };
+/* `a` is the live counter of the active generator. It lives on RNG so the
+   persistence layer can snapshot and restore the exact RNG position, making a
+   loaded sim continue along the same deterministic stream it would have. */
+export const RNG = { fn: null, a: 0 };
 
 export function makeRNG(seed) {
-  let a = seed >>> 0;
+  RNG.a = seed >>> 0;
   return function () {
-    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let a = RNG.a | 0;
+    a = a + 0x6D2B79F5 | 0;
+    RNG.a = a;
     let t = Math.imul(a ^ a >>> 15, 1 | a);
     t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
     return ((t ^ t >>> 14) >>> 0) / 4294967296;
   };
+}
+
+/* rebuild a generator that resumes from a saved counter position */
+export function restoreRNG(a) {
+  RNG.fn = makeRNG(0);   // install a fresh closure that reads RNG.a
+  RNG.a = a >>> 0;       // then seat it at the saved position
 }
 
 export const rand  = () => RNG.fn();

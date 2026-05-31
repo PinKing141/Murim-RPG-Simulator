@@ -640,7 +640,8 @@ export const LEGENDARY_TITLES = [
     realmMin: 7,
     test: (f, st) => {
       const s = f.sect;
-      return f.fame >= 70 && s && s.headId === f.id && st.blocs.some(b => b.alive && b.members.includes(s.id) && b.members.length >= 2);
+      return f.fame >= 70 && s && s.headId === f.id && st.blocs.some(b =>
+        b.alive && b.memberSects && b.memberSects.includes(s.id) && b.memberSects.length >= 2);
     },
     announce: (f) =>
       `Through war, trial, and long years, ${ref(f)} has proven supremacy over all contenders. The Murim knows them as <b class="leg-title">Martial King (무왕)</b>.`
@@ -674,6 +675,17 @@ export const LEGENDARY_TITLES = [
     },
     announce: (f) =>
       `The shadow guilds of the Gangho do not crown openly — but ${ref(f)}'s name has reached every ear. None dispute the title of <b class="leg-title">Assassin King (살왕)</b>. The blade-for-hire who became the blade all others fear.`
+  },
+  {
+    kind: "tournament-grandmaster",
+    en: "Tournament Grandmaster", kr: "비무대종사",
+    pathReq: null,
+    alignReq: null,
+    realmMin: 5,
+    /* Three or more grand-tournament victories — the great champion of an age. */
+    test: (f) => (f.tournamentsWon || 0) >= 3 && f.fame >= 50,
+    announce: (f) =>
+      `Thrice and more upon the great platform, ${ref(f)} has stood victorious before the assembled Murim. No champion of this age is their equal. They are hailed <b class="leg-title">Tournament Grandmaster (비무대종사)</b>.`
   },
   /* Heavenly Demon (천마) is handled by the existing threat system —
      see sysLegendaryTitles() which syncs isThreat → legendaryTitle. */

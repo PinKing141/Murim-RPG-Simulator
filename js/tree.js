@@ -2,6 +2,7 @@ import { cap } from './rng.js';
 import { ALIGN, REALMS, REALM_KR, DOCTRINES } from './data.js';
 import { STATE, figById } from './state.js';
 import { bloodlineRoot, childrenOf, genDistance, bloodGrudges } from './bloodlines.js';
+import { icon } from './icons.js';
 
 /*
   The History Explorer. Clicking any figure answers four questions instantly:
@@ -25,7 +26,7 @@ function figLabel(f) {
 function taintBadge(f) {
   if (!f.bloodlineTaint) return '';
   const lvl = f.bloodlineTaint >= 80 ? 'high' : f.bloodlineTaint >= 40 ? 'mid' : 'low';
-  return `<span class="tree-taint tree-taint-${lvl}" title="Bloodline taint ${f.bloodlineTaint}">☯</span>`;
+  return `<span class="tree-taint tree-taint-${lvl}" title="Bloodline taint ${f.bloodlineTaint}">${icon('taegeuk', { size: 11 })}</span>`;
 }
 function realmTag(f) {
   const kr = REALM_KR[f.realm] || '';
@@ -51,7 +52,7 @@ function renderBloodNode(f, depth, rootId, focusId) {
   let spouseTag = '';
   if (f.spouse) {
     const sp = figById(f.spouse);
-    if (sp) spouseTag = `<span class="tree-spouse" data-explore="${sp.id}" title="${figLabel(sp)}">⚭ ${figLabel(sp)}</span>`;
+    if (sp) spouseTag = `<span class="tree-spouse" data-explore="${sp.id}" title="${figLabel(sp)}">${icon('marriage', { size: 11 })} <span>${figLabel(sp)}</span></span>`;
   }
 
   const nodeHtml = `
@@ -307,7 +308,7 @@ function buildDetail(f) {
       h += `<div class="he-feud ${bcls}">`;
       h += `<span class="he-feud-target">against ${target ? `<a data-explore="${target.id}">${figLabel(target)}</a>` : 'a fallen enemy'}${target && !target.alive ? ' <span class="he-dim">(slain)</span>' : ''}</span>`;
       if (age != null) h += `<span class="he-feud-age">${band} · ${age}y unresolved</span>`;
-      if (originEid != null) h += `<button class="he-jump" data-chain="${originEid}">⛓ origin</button>`;
+      if (originEid != null) h += `<button class="he-jump" data-chain="${originEid}">${icon('chain')} <span>origin</span></button>`;
       h += `</div>`;
     }
     h += `</div>`;
@@ -349,8 +350,8 @@ export function buildTreeView(figId, mode = 'blood') {
   const dist = isLineage ? 0 : genDistance(f, root.id);
 
   let h = `<div class="he-modebar">`;
-  h += `<button class="he-mode ${!isLineage ? 'on' : ''}" data-mode="blood" data-fig="${f.id}">⚮ Bloodline</button>`;
-  h += `<button class="he-mode ${isLineage ? 'on' : ''}" data-mode="lineage" data-fig="${f.id}">⚔ Martial Lineage</button>`;
+  h += `<button class="he-mode ${!isLineage ? 'on' : ''}" data-mode="blood" data-fig="${f.id}">${icon('ring')} <span>Bloodline</span></button>`;
+  h += `<button class="he-mode ${isLineage ? 'on' : ''}" data-mode="lineage" data-fig="${f.id}">${icon('swords')} <span>Martial Lineage</span></button>`;
   h += `</div>`;
 
   /* the four-question detail for the focused figure */
