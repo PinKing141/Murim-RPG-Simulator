@@ -534,8 +534,10 @@ button.ctl.primary:hover {
   border: 1px solid var(--line-2); border-radius: 2px; padding: 2px 7px;
   color: var(--ink-dim);
 }
-.dos-alive { color: var(--jade); border-color: color-mix(in srgb, var(--jade) 50%, transparent); }
-.dos-dead  { color: var(--ink-faint); border-color: var(--ink-faint); opacity: .6; }
+.dos-alive    { color: var(--jade); border-color: color-mix(in srgb, var(--jade) 50%, transparent); }
+.dos-dead     { color: var(--ink-faint); border-color: var(--ink-faint); opacity: .6; }
+.dos-gender-f { color: #c97bba; border-color: #7a4470; }
+.dos-tradition { opacity: .75; font-size: 11px; }
 
 .dos-meta  {
   font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--ink-faint);

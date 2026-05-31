@@ -1,6 +1,13 @@
 export const SURNAMES = ["Kim","Lee","Park","Choi","Jung","Kang","Cho","Yoon","Jang","Lim","Han","Oh","Seo","Shin","Kwon","Hwang","Ahn","Song","Yoo","Hong","Baek","Heo","Nam","Moon","Yang","Bae","Ko","No","Sim","Jeon"];
 export const CLAN_SURNAMES = ["Namgung","Jegal","Dang","Moyong","Hwangbo","Sima","Dokgo","Seonu"];
-export const GIVEN = ["Mu-jin","Cheon","Ho","Jin","Woon","Hyuk","Seol","Yeon","Rin","Hwi","Gang","Tae-ho","Jun","Hye-rin","Soo","Min","Seong","Hyun","Woo","Jae","Yul","Cheol","Baek","Ryeon","Dae","Gyeom","Sa-hyeon","Ui","Beom","Sang","Eun","Yeo-wol","Ha-rin","Mu-gak","Seo-rin"];
+
+/* gendered given-name pools — used when gender is known at birth */
+export const GIVEN_MALE   = ["Mu-jin","Cheon","Ho","Jin","Woon","Hyuk","Hwi","Gang","Tae-ho","Jun","Soo","Seong","Hyun","Woo","Jae","Yul","Cheol","Dae","Gyeom","Sa-hyeon","Ui","Beom","Sang","Mu-gak","Cheol-won","Beom-su","Jae-ha","Tae-yang","Seon-ho","Gwon-il","Hak","Do-hyeon","Mu-hyeon","Chun-bae","Ryong"];
+export const GIVEN_FEMALE = ["Seol","Yeon","Rin","Hye-rin","Ryeon","Eun","Yeo-wol","Ha-rin","Seo-rin","Wol-hyang","So-yeon","Chae-rin","Bi-ryeon","Hwa-gyeong","Seo-hwa","Na-hyang","Wol-dan","Gyeong-hwa","Su-ryeon","Ha-eun","Jeong-hwa","Sa-wol","Cheon-hwa","Bi-dam","Na-hee","Seol-ha"];
+export const GIVEN_NEUTRAL = ["Min","Baek","Rin","Yul","San","Ha","Ryu","Woon"];
+
+/* keep legacy export so external code that imported GIVEN still works */
+export const GIVEN = [...GIVEN_MALE, ...GIVEN_FEMALE];
 
 export const BH_PRE = [
   ["Hyeol","혈","Blood"],["Geom","검","Sword"],["Do","도","Saber"],["Gwon","권","Fist"],
@@ -208,6 +215,71 @@ export function artAffinity(f, art) {
   if (tiers.natural.includes(f.personality))   return "natural";
   if (tiers.resistant.includes(f.personality)) return "resistant";
   return "neutral";
+}
+
+/* ============================================================
+   SECT TRADITIONS — succession + recruitment attitudes toward gender
+   ============================================================ */
+
+/*
+  Each sect is assigned one of three succession traditions at founding.
+  Conservative sects prefer male-line heirs and create crises when daughters
+  must inherit. Progressive sects care only about merit. Matriarchal sects
+  (rare) mirror conservative but inverted — found mainly in palace lineages.
+*/
+export const SUCCESSION_TRADITIONS = {
+  patriarchal:  { key:"patriarchal",  label:"Patriarchal Line",   kr:"부계",  maleBonus: 22, femaleBonus: -18 },
+  meritocratic: { key:"meritocratic", label:"Meritocratic",       kr:"능력제", maleBonus:  0, femaleBonus:   0 },
+  matriarchal:  { key:"matriarchal",  label:"Matriarchal Line",   kr:"모계",  maleBonus:-18, femaleBonus:  22 }
+};
+
+/* probability weights for each tradition per alignment when a sect is founded */
+export const TRADITION_BY_ALIGN = {
+  orthodox:   ["patriarchal","patriarchal","patriarchal","meritocratic"],
+  unorthodox: ["patriarchal","meritocratic","meritocratic","meritocratic"],
+  demonic:    ["patriarchal","meritocratic","meritocratic"],
+  recluse:    ["meritocratic","meritocratic","meritocratic","matriarchal"]
+};
+
+/* recruitment bias: some sects lean toward recruiting one gender */
+export const RECRUIT_BIAS = {
+  any:    { key:"any",    label:"Open Recruitment",     kr:"무차별" },
+  male:   { key:"male",   label:"Male Disciples",       kr:"남제자" },
+  female: { key:"female", label:"Female Disciples",     kr:"여제자" }
+};
+
+/* ============================================================
+   YIN/YANG ART AFFINITY — stacked on top of personality affinity
+   Arts carry a polarity; mismatch gives a moderate penalty, not a hard wall.
+   ============================================================ */
+
+/*
+  polarity: "yin" | "yang" | "balanced"
+  Yin arts align more naturally with female cultivators (and recluse/devout);
+  yang arts align more with male (and aggressive/fanatical).
+  Balanced arts (most manuals) are unaffected.
+  A woman of exceptional talent overcomes yang resistance — same gain formula,
+  just a softer ceiling before Form Realm, and extra fame when she does.
+*/
+export const ART_POLARITY_BY_SUF = {
+  "Singong":  "balanced", // Divine Art
+  "Geombeop": "yang",     // Sword Art
+  "Dobeop":   "yang",     // Saber Art
+  "Gwonbeop": "yang",     // Fist Art  (external strength)
+  "Jangbeop": "balanced", // Palm Art  (internal force)
+  "Simbeop":  "yin",      // Heart Method (inner cultivation)
+  "Bobeop":   "balanced", // Step Method
+  "Jibeop":   "yin",      // Finger Art (precise, internal)
+  "Sinbeop":  "balanced"  // Movement Art
+};
+
+/* bonus/penalty modifier to cultivation gain based on polarity mismatch */
+export function polarityAffinity(f, art) {
+  if (!art || !art.polarity || art.polarity === "balanced") return 1.0;
+  const isFemale = f.gender === "female";
+  if (art.polarity === "yin")  return isFemale ? 1.12 : 0.88;
+  if (art.polarity === "yang") return isFemale ? 0.88 : 1.12;
+  return 1.0;
 }
 
 /* Arts are corruptive based on their alignment, not a raw number.

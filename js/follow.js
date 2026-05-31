@@ -1,5 +1,5 @@
 import { cap, clamp } from './rng.js';
-import { ALIGN, REALMS, REALM_KR, TERRAIN, DOCTRINES, artAffinity, artCorruptType, ART_PRINCIPLES } from './data.js';
+import { ALIGN, REALMS, REALM_KR, TERRAIN, DOCTRINES, artAffinity, artCorruptType, ART_PRINCIPLES, SUCCESSION_TRADITIONS, RECRUIT_BIAS } from './data.js';
 import { STATE, figById, regionByName } from './state.js';
 import { bloodGrudges } from './bloodlines.js';
 import { stanceLabel } from './factions.js';
@@ -113,6 +113,7 @@ export function buildFigDossier(f) {
   h += `<div class="dos-badges">`;
   h += `<span class="dos-badge" style="border-color:${al.c};color:${al.c}">${al.kr} ${al.label}</span>`;
   h += `<span class="dos-badge ${f.alive ? 'dos-alive' : 'dos-dead'}">${f.alive ? '● Alive' : '✦ Deceased'}</span>`;
+  if (f.gender === "female") h += `<span class="dos-badge dos-gender-f">여 Female</span>`;
   if (f.legendaryTitle) h += `<span class="dos-badge dos-leg-title" style="border-color:var(--gold);color:var(--gold)">${f.legendaryTitle.en} · ${f.legendaryTitle.kr}</span>`;
   else if (f.isThreat) h += `<span class="dos-badge" style="border-color:var(--blood);color:var(--blood)">천마 Heavenly Demon</span>`;
   h += `</div>`;
@@ -180,7 +181,10 @@ export function buildFigDossier(f) {
       h += `<div class="dos-conn"><span class="dos-role">Disciples</span>${disciples.slice(0,4).map(flink).join(', ')}${disciples.length > 4 ? ` +${disciples.length-4}` : ''}</div>`;
     }
     if (brothers.length) {
-      h += `<div class="dos-conn"><span class="dos-role">Brothers</span>${brothers.map(flink).join(', ')}</div>`;
+      /* "brothers" array holds all sworn siblings regardless of gender */
+      const sibLabel = brothers.every(s => s.gender === "female") ? "Sisters"
+        : brothers.every(s => s.gender === "male") ? "Brothers" : "Sworn Siblings";
+      h += `<div class="dos-conn"><span class="dos-role">${sibLabel}</span>${brothers.map(flink).join(', ')}</div>`;
     }
     if (grudges.length) {
       h += `<div class="dos-conn"><span class="dos-role">Grudges</span>${grudges.map(flink).join(', ')}</div>`;
@@ -331,6 +335,15 @@ export function buildSectDossier(s) {
   }
   h += `<div class="dos-meta">Founded Year ${s.founded}${!s.alive && s.deadYear ? ` · Dissolved Year ${s.deadYear}` : ''} · ${s.region}${reg ? ` · ${TERRAIN[reg.terrain].label}` : ''}</div>`;
   h += `<div class="dos-meta">Prestige ${Math.round(s.prestige)} · Legitimacy ${Math.round(s.legitimacy)} · ${living.length} living disciples · ${s.allMembers.length} total</div>`;
+  /* tradition + recruitment bias */
+  if (s.successionTradition || s.recruitBias) {
+    const trad = s.successionTradition ? SUCCESSION_TRADITIONS[s.successionTradition] : null;
+    const bias = s.recruitBias ? RECRUIT_BIAS[s.recruitBias] : null;
+    const parts = [];
+    if (trad) parts.push(`${trad.label} <span class="dos-tkr">${trad.kr}</span>`);
+    if (bias && bias.key !== "any") parts.push(`${bias.label} <span class="dos-tkr">${bias.kr}</span>`);
+    if (parts.length) h += `<div class="dos-meta dos-tradition">${parts.join(' · ')}</div>`;
+  }
   if (reg) {
     h += `<div class="dos-meta">Seat: ${TERRAIN[reg.terrain].label} — prosperity ${Math.round(reg.prosperity)}, stability ${Math.round(reg.stability)}, population ${Math.round(reg.population)}</div>`;
   }

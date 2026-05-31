@@ -1,7 +1,7 @@
 import { rand, ri, pick, chance, clamp, cap } from './rng.js';
-import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN, TERRAIN, REGION_TERRAIN, IMPERIAL_REGION, DOCTRINES, artAffinity, artCorruptType, TOURNEY_NAMES, RELIC_DEEDS, PERSONALITY_PRINCIPLE_BIAS, ART_PRINCIPLES, ART_COMMENTARY, ART_BRANCH_NAMES, LEGITIMACY_SOURCES, SECT_FACTIONS, LEGENDARY_TITLES, initTitleRef } from './data.js';
+import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN, TERRAIN, REGION_TERRAIN, IMPERIAL_REGION, DOCTRINES, artAffinity, artCorruptType, polarityAffinity, TOURNEY_NAMES, RELIC_DEEDS, PERSONALITY_PRINCIPLE_BIAS, ART_PRINCIPLES, ART_COMMENTARY, ART_BRANCH_NAMES, LEGITIMACY_SOURCES, SECT_FACTIONS, LEGENDARY_TITLES, initTitleRef, SUCCESSION_TRADITIONS, GIVEN_MALE, GIVEN_FEMALE } from './data.js';
 import { STATE, aliveFigs, aliveSects, figById, makeFigure, makeArt, makeSect, addToSect, recomputeLife, recomputePower, makeByeolho, regionByName, makeRelic, relicById } from './state.js';
-import { chron, ref, plainRef, sref, aref, bref, rref } from './chronicle.js';
+import { chron, ref, plainRef, sref, aref, bref, rref, pro, proObj, proPoss } from './chronicle.js';
 import {
   addGrudge, decayGrudges, bloodGrudges, dropGrudge, inheritGrudgesOnDeath,
   propagateTaintFrom, genDistance, makeChild, livingChildren
@@ -18,6 +18,14 @@ initTitleRef(f => ref(f));
 
 /* nudge a sect's institutional authority, kept in bounds */
 function legit(s, d) { if (s) s.legitimacy = clamp(s.legitimacy + d, 0, 100); }
+
+/* gender of a new recruit, shaped by sect bias (but never absolute) */
+function recruitGender(s) {
+  const bias = s && s.recruitBias;
+  if (bias === "female") return chance(.78) ? "female" : "male";
+  if (bias === "male")   return chance(.78) ? "male"   : "female";
+  return chance(.32) ? "female" : "male";          // default ~32% female
+}
 
 /* behavioral doctrine: head personality drives day-to-day conduct;
    fall back to founding doctrine only if the seat is empty */
@@ -317,6 +325,8 @@ export function sysCultivation() {
       const aff = artAffinity(f, f.art);
       if (aff === "natural")   gain *= 1.18;
       else if (aff === "resistant") gain *= 0.78;
+      /* yin/yang polarity: cultural friction, not biological ceiling */
+      gain *= polarityAffinity(f, f.art);
     }
     f.progress += gain;
     if (f.progress >= 100) {
@@ -377,7 +387,8 @@ export function sysRecruitment() {
     if (living.length < 3) {
       for (let i = 0; i < ri(1, 2); i++) {
         const tr = recruitTraits(s);
-        const f = makeFigure({ align: s.align, sect: s, art: s.signatureArt, realm: 0, age: ri(13,18), talent: tr.talent });
+        const gender = recruitGender(s);
+        const f = makeFigure({ align: s.align, sect: s, art: s.signatureArt, realm: 0, age: ri(13,18), talent: tr.talent, gender });
         if (tr.drift) f.alignmentDrift = clamp(f.alignmentDrift + tr.drift, 0, 100);
         addToSect(s, f); STATE.figures.push(f);
         if (s.signatureArt) s.signatureArt.holders++;
@@ -385,7 +396,8 @@ export function sysRecruitment() {
     } else if (chance(recruitP) && living.length < 14) {
       const master = pick(living.filter(x => x.realm >= 3)) || pick(living);
       const tr = recruitTraits(s);
-      const f = makeFigure({ align: s.align, sect: s, art: s.signatureArt, realm: 0, age: ri(12,17), talent: tr.talent, master: master ? master.id : null });
+      const gender = recruitGender(s);
+      const f = makeFigure({ align: s.align, sect: s, art: s.signatureArt, realm: 0, age: ri(12,17), talent: tr.talent, master: master ? master.id : null, gender });
       if (tr.drift) f.alignmentDrift = clamp(f.alignmentDrift + tr.drift, 0, 100);
       addToSect(s, f); STATE.figures.push(f);
       if (s.signatureArt) s.signatureArt.holders++;
@@ -630,6 +642,13 @@ export function sysCorruptionAndThreat() {
           `${ref(f)} and the ${f.art.name} (${f.art.kr}) have grown inseparable — the art no longer feels like a manual to be memorised, but a second nature.`,
           "normal", [f.id], [], []);
       }
+      /* a cultivator who overcame polarity friction becomes notable for it */
+      if (f.art && f.realm === 5 && f.progress < 5 && polarityAffinity(f, f.art) < 1.0) {
+        f.fame += 6;
+        chron("c-affinity",
+          `The Murim takes notice: ${ref(f)} has reached ${REALMS[5]} (${REALM_KR[5]}) in the ${f.art.name} (${f.art.kr}) — an art whose ${f.art.polarity === "yang" ? "yang fire" : "yin depth"} ${proPoss(f)} nature was said to resist. ${f.gender === "female" && f.art.polarity === "yang" ? "The elders who doubted her fall silent." : "Talent proves stronger than tradition."}`,
+          "major", [f.id], [], []);
+      }
     }
     if (!STATE.threatActive && STATE.year >= STATE.threatCooldownUntil && f.align === "demonic" && f.realm >= 7 && f.alignmentDrift >= 85 && chance(.4)) {
       f.isThreat = true; STATE.threatActive = true;
@@ -750,10 +769,15 @@ export function sysHeroicArcs() {
     if (figs.length >= 2) {
       const a = pick(figs); let b = pick(figs); let g = 0; while (b === a && g++ < 4) b = pick(figs);
       if (a !== b) {
+        /* choose bond text based on genders */
+        const bothMale   = a.gender === "male"   && b.gender === "male";
+        const bothFemale = a.gender === "female"  && b.gender === "female";
+        const bondLabel  = bothFemale ? "sisterhood" : bothMale ? "brotherhood" : "a sworn bond";
+        const bondFlower = bothFemale ? "the plum blossoms" : "the peach blossoms";
         const arc = pick([
-          { cls: "c-peace",   kind: "brother",  fn: () => `${ref(a)} and ${ref(b)} swear brotherhood beneath the peach blossoms, vowing to share fortune and ruin alike.` },
-          { cls: "c-duel",    kind: "duel",     fn: () => `A bitter duel: ${ref(a)} defeats ${ref(b)} atop ${pick(["Sword-Testing Cliff","the Frozen Pavilion","Lone Goose Peak","the Drunken Bridge"])}, sparing their life — and earning a lifelong grudge.` },
-          { cls: "c-lineage", kind: "betray",   fn: () => `${ref(b)} betrays ${ref(a)}, stealing a page of their manual under the new moon.` },
+          { cls: "c-peace",   kind: "brother",  fn: () => `${ref(a)} and ${ref(b)} swear ${bondLabel} beneath ${bondFlower}, vowing to share fortune and ruin alike.` },
+          { cls: "c-duel",    kind: "duel",     fn: () => `A bitter duel: ${ref(a)} defeats ${ref(b)} atop ${pick(["Sword-Testing Cliff","the Frozen Pavilion","Lone Goose Peak","the Drunken Bridge"])}, sparing ${proObj(b)} life — and earning a lifelong grudge.` },
+          { cls: "c-lineage", kind: "betray",   fn: () => `${ref(b)} betrays ${ref(a)}, stealing a page of ${proPoss(a)} manual under the new moon.` },
           { cls: "c-lineage", kind: "disciple", fn: () => `${ref(a)} takes ${ref(b)} as a sworn disciple, passing down hard-won insight.` },
           { cls: "c-peace",   kind: "romance",  fn: () => `Rumour spreads that ${ref(a)} has fallen in love with ${ref(b)} — a romance the sects forbid.` }
         ]);
@@ -785,6 +809,7 @@ export function sysBonds() {
       Math.abs(b.age - a.age) <= 18 &&
       !a.parents.includes(b.id) && !b.parents.includes(a.id) &&
       !shareParent(a, b) &&
+      b.gender !== a.gender &&           // traditional marriage pairing
       ALIGN_OK(a.align, b.align));
     if (!cand.length) continue;
     /* a match within a clan, or that marries into one, is favoured — dynasties seek dynasties */
@@ -807,10 +832,19 @@ export function sysBonds() {
       }
     }
     if (a.namedAt != null || b.namedAt != null || a.clan || b.clan || stateMatch) {
-      const line = stateMatch
-        ? ` — a marriage of state (정략혼) knitting two houses of ${bref(ba)} closer`
-        : (a.clan || b.clan) ? ` — a union binding the ${a.clan || b.clan} (${(a.clan||b.clan)}세가) line` : "";
-      chron("c-bond", `${ref(a)} and ${ref(b)} are wed${line}.`, "normal", [a.id, b.id]);
+      /* identify the bride and groom for pronoun-aware text */
+      const bride  = a.gender === "female" ? a : b;
+      const groom  = a.gender === "female" ? b : a;
+      let line = "";
+      if (stateMatch) {
+        const brideRole = bride.sect && bride.sect.headId === bride.id ? "장문인" : (bride.clan ? `daughter of the ${bride.clan}세가` : "emissary");
+        line = ` — a marriage of state (정략혼): ${ref(bride)}, ${brideRole}, goes to ${sref(groom.sect || bride.sect)} to seal the alliance. ${bref(ba)} draws tighter.`;
+      } else if (bride.clan || groom.clan) {
+        line = ` — a union binding the ${bride.clan || groom.clan} (${(bride.clan||groom.clan)}세가) line`;
+      }
+      chron("c-bond",
+        `${ref(bride)} and ${ref(groom)} are wed${line}.`,
+        stateMatch ? "major" : "normal", [a.id, b.id]);
     }
   }
 }
@@ -1293,6 +1327,12 @@ function legitimacyProfile(s, c, dead) {
     /* a clashing personality actively costs legitimacy in a doctrinal house */
     const clash = (s.align === "orthodox" && (c.personality === "bloodthirsty" || c.personality === "mercenary"));
     if (clash) sources.doctrineAlign = -14;
+  }
+  /* Succession Tradition — conservative sects resist female heirs; matriarchal sects resist male */
+  const tradition = s.successionTradition && SUCCESSION_TRADITIONS[s.successionTradition];
+  if (tradition) {
+    const bias = c.gender === "female" ? tradition.femaleBonus : tradition.maleBonus;
+    if (bias !== 0) sources.traditionBias = bias;
   }
   const total = Object.values(sources).reduce((t, v) => t + v, 0);
   return { total, sources };
@@ -2007,6 +2047,64 @@ export function sysLegendaryTitles() {
 }
 
 /* strip legendary title on death (called inside killFigure) */
+/* ── Historic Firsts ──────────────────────────────────────────────────────
+   Detects and records moments that break gender expectations for the first
+   time in this world's history: first female sect head in a patriarchal
+   house, first female Nature Realm cultivator, first female bloc leader.
+   ──────────────────────────────────────────────────────────────────────── */
+export function sysFirstMoments() {
+  /* 1. sect heads */
+  for (const s of aliveSects()) {
+    if (!s.headId) continue;
+    const head = figById(s.headId);
+    if (!head) continue;
+    if (head.gender === "female" && !STATE.firstFemaleHeadSects.has(s.id)) {
+      STATE.firstFemaleHeadSects.add(s.id);
+      const note = s.successionTradition === "patriarchal"
+        ? `, breaking the patriarchal tradition (${s.kr}부계) of the house`
+        : s.successionTradition === "matriarchal" ? ""
+        : `, a first in the history of the house`;
+      chron("c-rise",
+        `${ref(head)} takes the seat of 장문인 in ${sref(s)}${note}. History turns a quiet page.`,
+        "major", [head.id], [s.id]);
+    }
+    if (head.gender === "male" && s.successionTradition === "matriarchal" && !STATE.firstMaleHeadSects.has(s.id)) {
+      STATE.firstMaleHeadSects.add(s.id);
+      chron("c-rise",
+        `${ref(head)} takes the seat of 장문인 in ${sref(s)}, the first man to lead a house that has always passed its seat to women.`,
+        "major", [head.id], [s.id]);
+    }
+  }
+
+  /* 2. Nature Realm (apex) — has any woman reached it? */
+  if (!STATE.firstFemaleRealm8) {
+    const apex = aliveFigs().find(f => f.gender === "female" && f.realm >= 8);
+    if (apex) {
+      STATE.firstFemaleRealm8 = true;
+      apex.fame += 20;
+      chron("c-break",
+        `Heaven itself takes notice for a second reason: ${ref(apex)} has reached the <b style="color:var(--gold-bright)">Nature Realm (자연경)</b> — and the Murim, which has always spoken of this pinnacle in the voice of men, finds it has no words ready.`,
+        "epic", [apex.id]);
+    }
+  }
+
+  /* 3. Bloc / alliance leader */
+  if (!STATE.firstFemaleBloc) {
+    for (const b of aliveBlocs()) {
+      if (!b.leaderId) continue;
+      const leader = figById(b.leaderId);
+      if (leader && leader.gender === "female") {
+        STATE.firstFemaleBloc = true;
+        leader.fame += 14;
+        chron("c-rise",
+          `${ref(leader)} stands at the head of ${bref(b)} — the first woman to hold the title of 맹주 in a generation that doubted it possible.`,
+          "epic", [leader.id]);
+        break;
+      }
+    }
+  }
+}
+
 function passLegendaryTitleOnDeath(f) {
   if (!f.legendaryTitle) return;
   const t = f.legendaryTitle;
@@ -2039,6 +2137,7 @@ export function tick() {
     sysHermits();
     sysRelics();
     sysLegendaryTitles();
+    sysFirstMoments();
     sysFactions();
     sysIdeology();
     sysPatronage();

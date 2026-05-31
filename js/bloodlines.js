@@ -1,5 +1,5 @@
 import { ri, pick, chance, clamp } from './rng.js';
-import { GIVEN, DOCTRINE_KEYS, ALIGN_PERSONALITY_BIAS } from './data.js';
+import { GIVEN, GIVEN_MALE, GIVEN_FEMALE, GIVEN_NEUTRAL, DOCTRINE_KEYS, ALIGN_PERSONALITY_BIAS } from './data.js';
 import { STATE, figById, makeFigure, addToSect, recomputePower } from './state.js';
 
 /* How long a non-blood grudge (a duel, a slight) lingers before it fades.
@@ -129,7 +129,10 @@ export function makeChild(pA, pB) {
 
   const clan = carrier.clan || null;
   const surname = clan || carrier.surname;
-  const name = surname + " " + pick(GIVEN);
+  /* gender: roughly 50/50 at birth — biased by sect tradition only at recruitment */
+  const gender = chance(.5) ? "female" : "male";
+  const givenPool = gender === "female" ? GIVEN_FEMALE : GIVEN_MALE;
+  const name = surname + " " + pick(givenPool);
 
   /* talent is partly inherited; a great master's blood lifts the floor */
   const heritage = (pA.talent + pB.talent) / 2;
@@ -157,7 +160,7 @@ export function makeChild(pA, pB) {
     : (chance(.65) ? pick(ALIGN_PERSONALITY_BIAS[align] || DOCTRINE_KEYS) : pick(DOCTRINE_KEYS));
 
   const child = makeFigure({
-    name, clan, align,
+    name, clan, align, gender,
     talent, charisma, realm: 0, age: 0,
     sect,
     parents: [pA.id, pB.id],
@@ -172,6 +175,15 @@ export function makeChild(pA, pB) {
   if (famArt && !famArt.lost) { child.art = famArt; famArt.holders++; recomputePower(child); }
 
   if (sect) addToSect(sect, child);
+  /* register siblings — everyone who shares both parents */
+  const siblings = pA.children.filter(cid => pB.children.includes(cid)).map(figById).filter(Boolean);
+  for (const sib of siblings) {
+    if (!sib.brothers) sib.brothers = [];
+    if (!sib.brothers.includes(child.id)) sib.brothers.push(child.id);
+    if (!child.brothers) child.brothers = [];
+    if (!child.brothers.includes(sib.id)) child.brothers.push(sib.id);
+  }
+
   pA.children.push(child.id);
   pB.children.push(child.id);
 

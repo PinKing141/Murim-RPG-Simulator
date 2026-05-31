@@ -4,7 +4,9 @@ import {
   BH_PRE, BH_SUF, SECT_PRE, SECT_SUF, ART_PRE, ART_SUF,
   REGIONS, TERRAIN, REGION_TERRAIN, DOCTRINES, DOCTRINE_KEYS, ALIGN_PERSONALITY_BIAS,
   RELIC_TYPES, RELIC_PRE, RELIC_SUF,
-  ART_PRINCIPLES, ALIGN_PRINCIPLES, ART_PATH_BY_SUF
+  ART_PRINCIPLES, ALIGN_PRINCIPLES, ART_PATH_BY_SUF,
+  ART_POLARITY_BY_SUF, TRADITION_BY_ALIGN, RECRUIT_BIAS,
+  GIVEN_MALE, GIVEN_FEMALE
 } from './data.js';
 
 export const STATE = {
@@ -15,7 +17,11 @@ export const STATE = {
   dirtyLog: true, dirtyPanels: true,
   activeWars: [], threatActive: false, lastThreatFall: null,
   cultCooldownUntil: 0, threatCooldownUntil: 0, seed: 0,
-  showHangul: true, eraCompress: true
+  showHangul: true, eraCompress: true,
+  firstFemaleHeadSects: new Set(),   // sect ids that have already had a female head
+  firstMaleHeadSects:   new Set(),   // for matriarchal sects
+  firstFemaleRealm8: false,          // has a woman ever reached Nature Realm?
+  firstFemaleBloc: false             // has a woman ever led an alliance/bloc?
 };
 
 export function newId()    { return STATE.idc++; }
@@ -47,7 +53,8 @@ export function makeSectName(align) {
 export function makeArtName() {
   const p = pick(ART_PRE), s = pick(ART_SUF);
   return { roman: p[0] + " " + s[0], kr: p[1] + s[1], en: p[2] + " " + s[2],
-           path: ART_PATH_BY_SUF[s[0]] || "inner" };
+           path: ART_PATH_BY_SUF[s[0]] || "inner",
+           polarity: ART_POLARITY_BY_SUF[s[0]] || "balanced" };
 }
 
 export function makeArt(align) {
@@ -59,6 +66,7 @@ export function makeArt(align) {
     id: newId(), kind: "art",
     name: nm.en, kr: nm.kr, roman: nm.roman,
     path: nm.path,
+    polarity: nm.polarity,
     tier: ri(2, 6),
     align,
     corruption: align === "demonic" ? ri(35,70) : align === "unorthodox" ? ri(15,40) : ri(0,12),
@@ -151,6 +159,7 @@ export function makeFigure(opts = {}) {
     master: opts.master || null,
     lineage: opts.lineage || null,
     alive: true, born: STATE.year,
+    gender: opts.gender || (chance(.32) ? "female" : "male"),
     isThreat: false, namedAt: null, legendaryTitle: null,
     grudges: [], brothers: [],
     realmHistory: [], lineageId: null,
@@ -177,6 +186,12 @@ export function makeSect(opts = {}) {
   const nm = makeSectName(align);
   const doctrine = opts.doctrine || pick(DOCTRINE_KEYS);
   const doc = DOCTRINES[doctrine];
+  const traditionPool = TRADITION_BY_ALIGN[align] || TRADITION_BY_ALIGN.orthodox;
+  const successionTradition = opts.successionTradition || pick(traditionPool);
+  /* matriarchal sects (palace lineages) recruit primarily female disciples */
+  const recruitBias = opts.recruitBias ||
+    (successionTradition === "matriarchal" ? "female" :
+     align === "orthodox" && chance(.25) ? "male" : "any");
   return {
     id: newId(), kind: "sect",
     name: nm.en, kr: nm.kr, roman: nm.roman,
@@ -191,7 +206,11 @@ export function makeSect(opts = {}) {
     heirId: null,            // publicly groomed successor (set during the head's life)
     founderClan: null,       // surname of the founding house, for bloodline legitimacy
     founderId: null,
+    successionTradition,     // "patriarchal" | "meritocratic" | "matriarchal"
+    recruitBias,             // "any" | "male" | "female"
     succession: null,        // ongoing crisis: {startYear, claimantIds, factions, heat, resolvePath}
+    firstFemaleHead: false,  // has a woman ever led this sect?
+    firstMaleHead: false,    // has a man ever led this sect (for matriarchal sects)?
     alive: true, deadYear: null,
     fallEvent: null,
     atWarWith: [],

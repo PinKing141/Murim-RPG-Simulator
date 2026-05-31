@@ -13,7 +13,9 @@ export function genesis(seed) {
     log: [], eventIndex: new Map(), figIndex: new Map(),
     dirtyLog: true, dirtyPanels: true,
     activeWars: [], threatActive: false, lastThreatFall: null,
-    cultCooldownUntil: 0, threatCooldownUntil: 0, seed
+    cultCooldownUntil: 0, threatCooldownUntil: 0, seed,
+    firstFemaleHeadSects: new Set(), firstMaleHeadSects: new Set(),
+    firstFemaleRealm8: false, firstFemaleBloc: false
   });
 
   /* the mortal world first — terrain and the civilisation it sustains */
