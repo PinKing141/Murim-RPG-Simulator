@@ -194,6 +194,14 @@ export const DOCTRINES = {
     warMod: +0.05, killMod: 0, artBonus: +0.10, talentBonus: 0,
     legitBonus: +10, bloodGrudge: false, noForgive: false, blocResist: false,
     purgeThreshold: 0, c: "#c8a030"
+  },
+  itinerant: {
+    label: "Itinerant", kr: "개방",
+    tagline: "The road is the sect. The world is the dojo.",
+    warVerb: "rises from the gutters against",
+    warMod: -0.05, killMod: 0, artBonus: 0, talentBonus: +8,
+    legitBonus: -4, bloodGrudge: false, noForgive: false, blocResist: false,
+    purgeThreshold: 0, c: "#8b6a3e"
   }
 };
 export const DOCTRINE_KEYS = Object.keys(DOCTRINES);
@@ -202,7 +210,7 @@ export const DOCTRINE_KEYS = Object.keys(DOCTRINES);
    just a weighted bias so demonic houses breed wrathful heads more often */
 export const ALIGN_PERSONALITY_BIAS = {
   orthodox:   ["honourable","devout","scholarly","fanatical","reclusive","ambitious"],
-  unorthodox: ["scheming","mercenary","ambitious","wrathful","bloodthirsty","honourable"],
+  unorthodox: ["scheming","mercenary","ambitious","wrathful","bloodthirsty","honourable","itinerant"],
   demonic:    ["bloodthirsty","wrathful","fanatical","ambitious","scheming","mercenary"],
   recluse:    ["reclusive","scholarly","devout","honourable","scheming","wrathful"]
 };

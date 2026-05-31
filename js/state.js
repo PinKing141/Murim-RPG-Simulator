@@ -21,7 +21,8 @@ export const STATE = {
   firstFemaleHeadSects: new Set(),   // sect ids that have already had a female head
   firstMaleHeadSects:   new Set(),   // for matriarchal sects
   firstFemaleRealm8: false,          // has a woman ever reached Nature Realm?
-  firstFemaleBloc: false             // has a woman ever led an alliance/bloc?
+  firstFemaleBloc: false,            // has a woman ever led an alliance/bloc?
+  firstFemaleChampion: false         // has a woman ever won a major tournament?
 };
 
 export function newId()    { return STATE.idc++; }

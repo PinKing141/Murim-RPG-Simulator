@@ -15,7 +15,7 @@ export function genesis(seed) {
     activeWars: [], threatActive: false, lastThreatFall: null,
     cultCooldownUntil: 0, threatCooldownUntil: 0, seed,
     firstFemaleHeadSects: new Set(), firstMaleHeadSects: new Set(),
-    firstFemaleRealm8: false, firstFemaleBloc: false
+    firstFemaleRealm8: false, firstFemaleBloc: false, firstFemaleChampion: false
   });
 
   /* the mortal world first — terrain and the civilisation it sustains */

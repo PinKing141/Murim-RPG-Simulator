@@ -536,8 +536,10 @@ button.ctl.primary:hover {
 }
 .dos-alive    { color: var(--jade); border-color: color-mix(in srgb, var(--jade) 50%, transparent); }
 .dos-dead     { color: var(--ink-faint); border-color: var(--ink-faint); opacity: .6; }
-.dos-gender-f { color: #c97bba; border-color: #7a4470; }
-.dos-tradition { opacity: .75; font-size: 11px; }
+.dos-gender-f    { color: #c97bba; border-color: #7a4470; }
+.dos-tradition   { opacity: .75; font-size: 11px; }
+.fig-gender-f    { color: #c97bba; font-size: 10px; opacity: .85; }
+.sect-trad-badge { border-color: #6a4a28; color: #b8843a; font-size: 10px; }
 
 .dos-meta  {
   font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--ink-faint);

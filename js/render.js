@@ -1,5 +1,5 @@
 import { clamp, cap } from './rng.js';
-import { ALIGN, REALMS, REALM_KR, DOCTRINES } from './data.js';
+import { ALIGN, REALMS, REALM_KR, DOCTRINES, SUCCESSION_TRADITIONS } from './data.js';
 import { STATE, aliveFigs, aliveSects, figById } from './state.js';
 import { sectMight, topMember } from './systems.js';
 import { aliveBlocs, blocById, sectBloc, stanceLabel } from './factions.js';
@@ -269,6 +269,8 @@ export function renderPanels() {
         let out = '';
         if (fd) out += `<div class="doctrine-badge" style="color:${fd.c};border-color:${fd.c}" title="Founding doctrine">${fd.label}</div>`;
         if (hp && hp !== fd) out += `<div class="doctrine-badge doctrine-badge-head" style="color:${hp.c};border-color:${hp.c}" title="Head personality">⚔ ${hp.label}</div>`;
+        const trad = s.successionTradition && SUCCESSION_TRADITIONS[s.successionTradition];
+        if (trad && trad.key !== "meritocratic") out += `<div class="doctrine-badge sect-trad-badge" title="Succession tradition">${trad.kr}</div>`;
         return out;
       })()}
       <div class="pbar"><i style="width:${clamp(s.prestige,0,100)}%"></i></div>
@@ -315,7 +317,7 @@ export function renderPanels() {
         : { pw: "Power", fm: "Fame", ki: "Ki" };
       div.innerHTML = loc(`
         <div class="fig-name">${named ? `<span class="fig-alias">${cap(f.byeolho.en)} · ${f.byeolho.kr}</span>` : f.name}</div>
-        <div class="fig-sub">${named ? f.name + " · " : ""}${al.label}${f.legendaryTitle ? ` · <span class="leg-title-card">${f.legendaryTitle.en} · ${f.legendaryTitle.kr}</span>` : f.isThreat ? ` · <span style="color:var(--blood)">천마 HEAVENLY DEMON</span>` : ""}${f.sect ? " · " + f.sect.name : " · wanderer"}</div>
+        <div class="fig-sub">${named ? f.name + " · " : ""}${al.label}${f.gender === "female" ? ' · <span class="fig-gender-f">여</span>' : ""}${f.legendaryTitle ? ` · <span class="leg-title-card">${f.legendaryTitle.en} · ${f.legendaryTitle.kr}</span>` : f.isThreat ? ` · <span style="color:var(--blood)">천마 HEAVENLY DEMON</span>` : ""}${f.sect ? " · " + f.sect.name : " · wanderer"}</div>
         <span class="fig-realm">${REALMS[f.realm]} · ${REALM_KR[f.realm]}</span>
         <div class="fig-bars">
           <span>${lbl.pw}</span>${bar(f.power, 1100, al.c)}

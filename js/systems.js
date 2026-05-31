@@ -831,10 +831,22 @@ export function sysBonds() {
         }
       }
     }
-    if (a.namedAt != null || b.namedAt != null || a.clan || b.clan || stateMatch) {
-      /* identify the bride and groom for pronoun-aware text */
-      const bride  = a.gender === "female" ? a : b;
-      const groom  = a.gender === "female" ? b : a;
+    /* identify the bride and groom for pronoun-aware text */
+    const bride  = a.gender === "female" ? a : b;
+    const groom  = a.gender === "female" ? b : a;
+
+    /* diplomatic marriage: sects in different blocs (or no bloc) — forges a new tie */
+    const crossBloc = a.sect && b.sect && a.sect.id !== b.sect.id && (!ba || !bb || ba.id !== bb.id);
+    if (crossBloc && (a.clan || b.clan || a.namedAt != null || b.namedAt != null) && chance(.55)) {
+      /* boost relations between both sects — may nudge toward alliance later */
+      a.sect.stance = clamp((a.sect.stance || 0) + ri(3, 8), -100, 100);
+      b.sect.stance = clamp((b.sect.stance || 0) + ri(3, 8), -100, 100);
+      legit(a.sect, ri(2, 5)); legit(b.sect, ri(2, 5));
+      const brideRole = bride.clan ? `of the ${bride.clan}세가` : "";
+      chron("c-bond",
+        `${ref(bride)}${brideRole ? " " + brideRole : ""} and ${ref(groom)} are wed — a diplomatic union crossing house lines, binding ${sref(a.sect)} to ${sref(b.sect)} by blood.`,
+        "major", [a.id, b.id], [a.sect.id, b.sect.id]);
+    } else if (a.namedAt != null || b.namedAt != null || a.clan || b.clan || stateMatch) {
       let line = "";
       if (stateMatch) {
         const brideRole = bride.sect && bride.sect.headId === bride.id ? "장문인" : (bride.clan ? `daughter of the ${bride.clan}세가` : "emissary");
@@ -1921,8 +1933,10 @@ export function sysTournament() {
   champ.fame += ri(8, 16); maybeName(champ);
   if (champ.sect) { champ.sect.prestige = clamp(champ.sect.prestige + ri(5, 12), 0, 100); legit(champ.sect, ri(2, 6)); }
   const upset = field.indexOf(contenders.sort((a, b) => b.power - a.power)[0]) > 1;
+  const firstFemWin = champ.gender === "female" && !STATE.firstFemaleChampion;
+  if (firstFemWin) STATE.firstFemaleChampion = true;
   chron("c-tourney",
-    `${ref(champ)} stands victorious at ${tn[0]}, defeating ${ref(runnerUp)} in the final bout${upset ? " — an upset that will be spoken of for years" : ""}. ${champ.sect ? sref(champ.sect) + " basks in the glory." : "A wanderer's name echoes through the Gangho."}`,
+    `${ref(champ)} stands victorious at ${tn[0]}, defeating ${ref(runnerUp)} in the final bout${upset ? " — an upset that will be spoken of for years" : ""}. ${champ.sect ? sref(champ.sect) + " basks in the glory." : "A wanderer's name echoes through the Gangho."}${firstFemWin ? ` The Murim falls quiet a moment — no woman has ever taken this stage before.` : ""}`,
     "major", [champ.id, runnerUp.id], champ.sect ? [champ.sect.id] : [], [open.id]);
   /* a grudge is born of a public defeat */
   if (chance(.4)) addGrudge(runnerUp, champ.id, { event: open.id });
@@ -2060,13 +2074,24 @@ export function sysFirstMoments() {
     if (!head) continue;
     if (head.gender === "female" && !STATE.firstFemaleHeadSects.has(s.id)) {
       STATE.firstFemaleHeadSects.add(s.id);
-      const note = s.successionTradition === "patriarchal"
-        ? `, breaking the patriarchal tradition (${s.kr}부계) of the house`
+      const isPatriarchal = s.successionTradition === "patriarchal";
+      const note = isPatriarchal
+        ? `, breaking the patriarchal tradition (부계) of the house`
         : s.successionTradition === "matriarchal" ? ""
         : `, a first in the history of the house`;
       chron("c-rise",
         `${ref(head)} takes the seat of 장문인 in ${sref(s)}${note}. History turns a quiet page.`,
         "major", [head.id], [s.id]);
+      if (isPatriarchal) {
+        /* conservative elders resist — legitimacy dips and tension rises */
+        legit(s, ri(-18, -10));
+        s.tensionDebt = clamp((s.tensionDebt || 0) + ri(8, 14), 0, 100);
+        if (s.legitimacy < 35 && !s.succession) {
+          chron("c-faction",
+            `The elders of ${sref(s)} mutter against ${ref(head)}'s authority. A house divided between tradition and the weight of her talent.`,
+            "normal", [head.id], [s.id]);
+        }
+      }
     }
     if (head.gender === "male" && s.successionTradition === "matriarchal" && !STATE.firstMaleHeadSects.has(s.id)) {
       STATE.firstMaleHeadSects.add(s.id);
