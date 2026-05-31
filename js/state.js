@@ -225,6 +225,7 @@ export function makeSect(opts = {}) {
     doctrinalDebt: 0,
     reformLean: 0,
     patron: false,
+    courtFavor: 0,          // 0–100; only meaningful when patron:true
     tensionDebt: 0   // accumulated when head personality clashes with founding doctrine
   };
 }

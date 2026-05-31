@@ -1,5 +1,5 @@
 import { rand, ri, pick, chance, clamp, cap } from './rng.js';
-import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN, TERRAIN, REGION_TERRAIN, IMPERIAL_REGION, DOCTRINES, artAffinity, artCorruptType, polarityAffinity, TOURNEY_NAMES, RELIC_DEEDS, PERSONALITY_PRINCIPLE_BIAS, ART_PRINCIPLES, ART_COMMENTARY, ART_BRANCH_NAMES, LEGITIMACY_SOURCES, SECT_FACTIONS, LEGENDARY_TITLES, initTitleRef, SUCCESSION_TRADITIONS, GIVEN_MALE, GIVEN_FEMALE } from './data.js';
+import { REGIONS, REALMS, REALM_KR, APEX, PATH_FLAVOR, WAR_NAMES, ALIGN, TERRAIN, REGION_TERRAIN, IMPERIAL_REGION, DOCTRINES, artAffinity, artCorruptType, polarityAffinity, TOURNEY_NAMES, RELIC_DEEDS, PERSONALITY_PRINCIPLE_BIAS, ART_PRINCIPLES, ART_COMMENTARY, ART_BRANCH_NAMES, LEGITIMACY_SOURCES, SECT_FACTIONS, LEGENDARY_TITLES, initTitleRef, SUCCESSION_TRADITIONS, GIVEN_MALE, GIVEN_FEMALE, regionShort, COURT_DEMANDS, COURT_EDICTS } from './data.js';
 import { STATE, aliveFigs, aliveSects, figById, makeFigure, makeArt, makeSect, addToSect, recomputeLife, recomputePower, makeByeolho, regionByName, makeRelic, relicById } from './state.js';
 import { chron, ref, plainRef, sref, aref, bref, rref, pro, proObj, proPoss } from './chronicle.js';
 import {
@@ -290,8 +290,9 @@ function battle(A, B, pa, pb, w) {
   }
   const cA = topMember(winner), cB = topMember(loser);
   if (cA && cB && chance(.25)) {
+    const battleGeo = winner.region ? ` in ${regionShort(winner.region)}` : "";
     chron("c-duel",
-      `At the height of ${w.name}, ${ref(cA)} crosses blades with ${ref(cB)} — ${pick(["a clash that splits the very air","three hundred exchanges beneath a bleeding moon","steel and naegong until the river ran red"])}.`,
+      `At the height of ${w.name}${battleGeo}, ${ref(cA)} crosses blades with ${ref(cB)} — ${pick(["a clash that splits the very air","three hundred exchanges beneath a bleeding moon","steel and naegong until the river ran red"])}.`,
       "normal", [cA.id, cB.id], [], w.startEvent != null ? [w.startEvent] : []);
   }
 }
@@ -305,8 +306,11 @@ function endWar(w, A, B, winner, loser) {
     legit(winner, ri(4, 9)); legit(loser, -ri(6, 12));   // victory is its own claim to authority
     /* war scars the land it is fought over — population and order both bleed */
     for (const s of [winner, loser]) scarRegion(regionByName(s.region), ri(8, 16), ri(6, 12), w.startEvent);
+    const geoEndNote = winner.region === loser.region
+      ? ` across ${regionShort(winner.region)}`
+      : ` from ${regionShort(winner.region)} to ${regionShort(loser.region)}`;
     const ev = chron("c-war",
-      `${w.name} (${w.kr}) ends. ${sref(winner)} stands victorious; ${sref(loser)} is broken and humbled.`,
+      `${w.name} (${w.kr}) ends${geoEndNote}. ${sref(winner)} stands victorious; ${sref(loser)} is broken and humbled.`,
       "major", [], [winner.id, loser.id], w.startEvent != null ? [w.startEvent] : []);
     if (loser.prestige <= 8 || chance(.4)) dissolveSect(loser, `shattered in ${w.name}`, [ev.id]);
   }
@@ -577,9 +581,13 @@ export function sysRivalryAndWar() {
           enemyPaths ? "the orthodox cannot abide the demonic" :
           pick(["a stolen manual","an assassinated elder","a contested mountain","an old blood-debt","a marriage betrayed","a duel gone wrong"]);
         const eraSuffix = STATE.activeWars.length >= 2 ? `, ${eraTone()}` : '';
+        /* shared region = more vivid geography; different = grand coalition war */
+        const geoNote = a.region === b.region
+          ? ` across ${regionShort(a.region)}`
+          : ` from ${regionShort(a.region)} to ${regionShort(b.region)}`;
         const warLine = aHead?.warVerb
-          ? `${sref(a)} ${aHead.warVerb} ${sref(b)} — ${w.name} (${w.kr}) — over ${cause}${eraSuffix}.`
-          : `${pick(["Banners rise","War drums sound","Blood is sworn"])}: ${sref(a)} and ${sref(b)} fall into open war — ${w.name} (${w.kr}) — over ${cause}${eraSuffix}.`;
+          ? `${sref(a)} ${aHead.warVerb} ${sref(b)}${geoNote} — ${w.name} (${w.kr}) — over ${cause}${eraSuffix}.`
+          : `${pick(["Banners rise","War drums sound","Blood is sworn"])}${geoNote}: ${sref(a)} and ${sref(b)} fall into open war — ${w.name} (${w.kr}) — over ${cause}${eraSuffix}.`;
         const ev = chron("c-war", warLine, "major", [], [a.id, b.id], grudgeEv != null ? [grudgeEv] : []);
         w.startEvent = ev.id;
       }
@@ -758,7 +766,7 @@ export function sysSectFortune() {
       STATE.sects.push(s);
       maybeName(founder, true);
       chron("c-found",
-        `From the ashes, ${ref(founder)} establishes ${sref(s)} in ${s.region}. A new power rises where the old fell.`,
+        `From the ashes, ${ref(founder)} establishes ${sref(s)} in ${regionShort(s.region)}. A new power rises where the old fell.`,
         "major", [founder.id], [s.id], founder.originEvent != null ? [founder.originEvent] : []);
     }
   }
@@ -1849,17 +1857,99 @@ export function sysIdeology() {
   }
 }
 
+/* ---- wanderer founding: a masterless cultivator founds a new sect ---- */
+
+export function sysWandererFounding() {
+  const wanderers = aliveFigs().filter(f =>
+    f.sect === null && f.alive &&
+    (f.realm >= 8 || (f.realm >= 6 && f.fame > 60))
+  );
+  if (!wanderers.length || !chance(.18)) return;
+  const founder = pick(wanderers);
+  /* pick a compatible alignment for the new sect */
+  const s = makeSect({ align: founder.align, prestige: ri(30, 55) });
+  s.signatureArt = founder.art || (STATE.arts.filter(a => !a.lost && a.align === founder.align)[0]) || null;
+  founder.sect = s;
+  s.headId = founder.id;
+  s.founderId = founder.id;
+  s.founderClan = founder.clan || null;
+  addToSect(s, founder);
+  STATE.sects.push(s);
+  maybeName(founder, true);
+  const causeIds = founder.originEvent != null ? [founder.originEvent] : [];
+  chron("c-found",
+    `After years walking the Gangho without banner or house, ${ref(founder)} plants a stake in ${regionShort(s.region)} and opens the gates of ${sref(s)}. The wanderer becomes a founder.`,
+    "major", [founder.id], [s.id], causeIds);
+}
+
 /* ---- imperial entanglement: an external claim on legitimacy ---- */
 
 export function sysPatronage() {
+  /* gain new patrons */
   for (const s of aliveSects()) {
     if (s.region !== IMPERIAL_REGION || s.patron || s.align === "demonic" || !s.alive) continue;
     if (s.legitimacy >= 50 && chance(.05)) {
       s.patron = true;
+      s.courtFavor = ri(40, 60);
       legit(s, ri(8, 15));
       const r = regionByName(s.region); if (r) r.prosperity = clamp(r.prosperity + ri(4, 8), 0, 100);
-      chron("c-faction",
+      chron("c-court",
         `${sref(s)} accepts the patronage of the Imperial Court — gold and recognition flow in, but the martial world murmurs that a sword should bow to no throne.`,
+        "major", [], [s.id]);
+    }
+  }
+
+  /* once every ~40 years: designate a new patron from high-prestige orthodox sects */
+  if (STATE.year % 40 === 0) {
+    const candidates = aliveSects().filter(s =>
+      !s.patron && s.alive && s.align === "orthodox" && s.prestige > 60
+    );
+    if (candidates.length) {
+      /* remove old patron designation first */
+      for (const s of aliveSects()) {
+        if (s.patron) {
+          s.patron = false;
+          chron("c-court",
+            `The Imperial Court withdraws its formal patronage from ${sref(s)} — the throne's favour is fickle as the seasons.`,
+            "normal", [], [s.id]);
+        }
+      }
+      const newPatron = candidates.sort((a, b) => b.prestige - a.prestige)[0];
+      newPatron.patron = true;
+      newPatron.courtFavor = ri(45, 65);
+      legit(newPatron, ri(6, 12));
+      chron("c-court",
+        `The Emperor's seal goes out: ${sref(newPatron)}, foremost among the orthodox houses, is named the new patron sect of the Imperial Court.`,
+        "major", [], [newPatron.id]);
+    }
+  }
+
+  /* annual court favor fluctuation for all patron sects */
+  for (const s of aliveSects()) {
+    if (!s.patron || !s.alive) continue;
+    const head = s.headId ? figById(s.headId) : null;
+    const headFame = head && head.alive ? head.fame : 0;
+    /* favor shifts based on prestige and head fame */
+    const delta = ri(5, 15) * (s.prestige > 50 ? 1 : -1) + Math.round((headFame - 40) / 10);
+    s.courtFavor = clamp((s.courtFavor || 50) + delta, 0, 100);
+
+    if (s.courtFavor > 80) {
+      /* edict issued — prestige boost */
+      const edict = pick(COURT_EDICTS);
+      const edicText = edict
+        .replace("{sect}", sref(s))
+        .replace("{heir}", head ? ref(head) : "the house's chosen successor");
+      s.prestige = clamp(s.prestige + 5, 0, 100);
+      chron("c-court", edicText, "major", head ? [head.id] : [], [s.id]);
+    } else if (s.courtFavor < 20) {
+      /* falling from grace */
+      const prestigeLoss = ri(5, 10);
+      const legitLoss    = ri(5, 10);
+      s.prestige  = clamp(s.prestige - prestigeLoss, 0, 100);
+      legit(s, -legitLoss);
+      s.courtFavor = ri(20, 40);
+      chron("c-court",
+        `${sref(s)} has fallen from the Emperor's good graces — whispers in the capital speak of neglect and disrespect. Prestige crumbles; the sect scrambles to recover face.`,
         "major", [], [s.id]);
     }
   }
@@ -2207,6 +2297,7 @@ export function tick() {
     sysArtRefinement();
     sysRivalryAndWar();
     sysTournament();
+    sysWandererFounding();
     sysAssassination();
     sysCorruptionAndThreat();
     sysHermits();

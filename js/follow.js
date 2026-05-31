@@ -160,8 +160,10 @@ export function buildFigDossier(f) {
       const affLabel = aff === "natural" ? "⬆ Natural affinity" : aff === "resistant" ? "⬇ Resists this art" : "Neutral";
       const corrLabel = ct === "always" ? " · Inherently corruptive" : ct === "conditional" ? " · Corruptive to the resistant" : "";
       const affColor = aff === "natural" ? "var(--jade)" : aff === "resistant" ? "var(--blood)" : "var(--ink-dim)";
+      const polLabel = f.art.polarity && f.art.polarity !== "balanced"
+        ? ` · Polarity: ${f.art.polarity.charAt(0).toUpperCase() + f.art.polarity.slice(1)}` : "";
       h += `<div class="dos-conn"><span class="dos-role">Art</span><em class="art">${f.art.name} (${f.art.kr})</em> tier ${f.art.tier}`;
-      h += ` <span style="font-size:11px;color:${affColor}">${affLabel}${corrLabel}${f.art.cursed ? ' · <span style="color:var(--blood)">CURSED</span>' : ''}</span></div>`;
+      h += ` <span style="font-size:11px;color:${affColor}">${affLabel}${corrLabel}${polLabel}${f.art.cursed ? ' · <span style="color:var(--blood)">CURSED</span>' : ''}</span></div>`;
       /* living tradition: principles, deviation, commentaries */
       h += buildArtTraditionBlock(f.art);
     }
@@ -206,6 +208,10 @@ export function buildFigDossier(f) {
     }
     if (spouse) {
       h += `<div class="dos-conn"><span class="dos-role">Spouse</span>${flink(spouse)}</div>`;
+    }
+    if (f.betrothed) {
+      const betrothed = figById(f.betrothed);
+      if (betrothed) h += `<div class="dos-conn"><span class="dos-role">Betrothed</span>${flink(betrothed)}</div>`;
     }
     if (children.length) {
       const taintChild = (c) => {

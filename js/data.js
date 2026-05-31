@@ -110,6 +110,23 @@ export const REGION_TERRAIN = {
 };
 export const IMPERIAL_REGION = "the Imperial Capital";
 
+/* short name used in geographic chronicle phrases */
+export function regionShort(region) {
+  return region.replace(/^the\s+/i, "").replace(/\s*\([^)]*\)/, "").trim();
+}
+
+/* imperial court event flavour */
+export const COURT_DEMANDS = [
+  ["send tribute to the Imperial Court","공납"],["provide martial escorts for the imperial envoy","호위"],
+  ["cede a disciple to train the palace guard","헌제"],["deliver intelligence on the demonic factions","첩보"],
+  ["host an imperial inspection of their training grounds","검열"]
+];
+export const COURT_EDICTS = [
+  "An imperial edict arrives at {sect}: the throne names {heir} as the rightful successor to the 장문인 seat.",
+  "The court's seal is pressed upon a letter: {sect} is commanded to accept {heir} as heir, by imperial decree.",
+  "Rumour arrives before the edict does — the throne has taken an interest in {sect}'s succession."
+];
+
 /*
   Sect doctrines — the deep personality of a house, set at founding and
   never changed. Colours how it fights, remembers slights, refines its
@@ -652,7 +669,6 @@ export const LEGENDARY_TITLES = [
     test: (f) => {
       /* a killer of renown — grudges fulfilled, personality fits the shadow path */
       const shadowPersonality = ["scheming","mercenary","bloodthirsty","wrathful"].includes(f.personality);
-      const hasTrophies = (f.grudges && f.grudges.length === 0) && f.fame >= 50;
       /* no living grudges = settled all debts through killing */
       return shadowPersonality && f.fame >= 55 && f.realm >= 6;
     },
