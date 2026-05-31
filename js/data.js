@@ -444,13 +444,13 @@ export const LEGENDARY_TITLES = [
   },
   {
     kind: "fist-saint",
-    en: "Fist Saint", kr: "권성",
+    en: "Fist King", kr: "권왕",
     pathReq: ["fist"],
     alignReq: ["orthodox","unorthodox","recluse"],
     realmMin: 7,
     test: (f) => f.fame >= 55,
     announce: (f) =>
-      `Bare-handed, without sword or saber, ${ref(f)} has surpassed them all. The Murim recognises a <b class="leg-title">Fist Saint (권성)</b>.`
+      `Bare-handed, without sword or saber, ${ref(f)} has surpassed them all. The Murim recognises a <b class="leg-title">Fist King (권왕)</b>.`
   },
   {
     kind: "spear-saint",
